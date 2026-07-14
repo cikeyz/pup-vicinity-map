@@ -1,1391 +1,993 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PUP Vicinity Map</title>
-  <link rel="icon" type="image/svg+xml" href="https://upload.wikimedia.org/wikipedia/commons/2/2e/Polytechnic_University_of_the_Philippines.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,700;1,6..72,400&family=Outfit:wght@300;400;500;600;700&display=swap"
-    rel="stylesheet">
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-  <style>
-    
-
-    /* --- 1. VARIABLES & RESET --- */
-    :root {
-      --bg-canvas: #F7F6F3;
-      --bg-surface: #FFFFFF;
-      --bg-glass: rgba(255, 255, 255, 0.78);
-      --bg-panel: rgba(255, 255, 255, 0.92);
-      --border-whisper: #E8E6E1;
-      --border-subtle: rgba(0, 0, 0, 0.05);
-      --text-ink: #1C1917;
-      --text-steel: #787774;
-      --text-muted: #A8A59B;
-      --accent-maroon: #7C1818;
-      --accent-maroon-light: #9E2A2A;
-      --accent-gold: #BFA045;
-      --accent-gold-bright: #D4AF37;
-      --font-serif: 'Newsreader', Georgia, serif;
-      --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --panel-w: 360px;
-      --spring: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0
-    }
-
-    html {
-      scroll-behavior: smooth
-    }
-
-    body {
-      background: var(--bg-canvas);
-      color: var(--text-ink);
-      font-family: var(--font-sans);
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    ::-webkit-scrollbar {
-      width: 5px
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #D4D4D4;
-      border-radius: 3px
-    }
-
-    /* --- 2. HEADER (Minimal, floating) --- */
-    .page-header {
-      position: relative;
-      margin-bottom: 12px;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      padding: 0;
-    }
-
-    .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .header-brand img {
-      width: 42px;
-      height: 42px;
-      object-fit: contain;
-      display: block;
-      border-radius: 50%;
-      background: #ffffff;
-      border: 3px solid #ffffff;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 0 1px var(--border-whisper);
-    }
-
-    .header-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .header-text h1 {
-      font-family: var(--font-serif);
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.015em;
-      line-height: 1.1;
-      color: var(--accent-maroon);
-    }
-
-    .header-text span {
-      display: block;
-      font-size: 9px;
-      color: var(--text-steel);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      font-weight: 600;
-      line-height: 1.1;
-    }
-
-    .header-actions {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .howto-card {
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      z-index: 50;
-    }
-
-    /* --- 3. MAIN STAGE (Map centered) --- */
-    .main-stage {
-      flex: 1;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      overflow: hidden;
-    }
-
-    /* Map container â€” centered hero */
-    .map-hero {
-      position: relative;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-whisper);
-      border-radius: var(--radius-lg);
-      padding: 10px;
-      box-shadow: 0 24px 80px -24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.02);
-      transition: var(--spring);
-      max-width: 100%;
-      max-height: 100%;
-    }
-
-    .map-hero.panel-open {
-      margin-right: calc(var(--panel-w) + 16px);
-    }
-
-    @media(max-width:1024px) {
-      .map-hero.panel-open {
-        margin-right: 0;
-      }
-    }
-
-    .map-core {
-      position: relative;
-      overflow: hidden;
-      border-radius: var(--radius-md);
-      background: #EDECE8;
-      cursor: crosshair;
-      transition: width 0.55s cubic-bezier(0.16, 1, 0.3, 1), height 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    map area {
-      cursor: pointer;
-    }
-
-    /* Blurred fallback so edges never show empty space */
-    .map-bg {
-      position: absolute;
-      inset: 0;
-      background: url('stamesa.jpg') center/cover no-repeat;
-      filter: blur(20px) saturate(0.7);
-      -webkit-filter: blur(20px) saturate(0.7);
-      transform: scale(1.15);
-      /* slightly larger to cover blur bleed edges */
-      z-index: 0;
-    }
-
-    .map-core img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 1488px;
-      height: 811px;
-      display: block;
-      pointer-events: auto;
-      user-select: none;
-      -webkit-user-drag: none;
-    }
-
-    .map-core canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 1488px;
-      height: 811px;
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .map-core map {
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 3;
-    }
-
-    /* Hover tooltip */
-    .map-tooltip {
-      position: absolute;
-      z-index: 15;
-      background: rgba(28, 25, 23, 0.88);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      color: #fff;
-      font-family: var(--font-sans);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 5px 10px;
-      border-radius: 6px;
-      pointer-events: none;
-      opacity: 0;
-      transform: translateY(4px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      white-space: nowrap;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    .map-tooltip.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* Zoomed-in info card â€” rich detail panel anchored inside map viewport */
-    .zoom-info-card {
-      position: absolute;
-      left: 16px;
-      bottom: 16px;
-      z-index: 20;
-      width: 300px;
-      max-height: calc(100% - 32px);
-      overflow-y: auto;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-whisper);
-      border-radius: var(--radius-md);
-      padding: 0;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.03);
-      opacity: 0;
-      transform: translateY(12px);
-      pointer-events: none;
-      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .zoom-info-card::-webkit-scrollbar {
-      width: 3px;
-    }
-
-    .zoom-info-card::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 3px;
-    }
-
-    .zoom-info-card.show {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-
-    /* Card inner sections */
-    .zic-header {
-      padding: 14px 16px 10px;
-      border-bottom: 1px solid var(--border-whisper);
-    }
-
-    .zic-title-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .zic-name {
-      font-family: var(--font-serif);
-      font-size: 16px;
-      font-weight: 700;
-      line-height: 1.2;
-      color: var(--text-ink);
-    }
-
-    .zic-badge {
-      background: rgba(124, 24, 24, 0.06);
-      border: 1px solid rgba(124, 24, 24, 0.12);
-      color: var(--accent-maroon);
-      font-size: 8px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      padding: 2px 8px;
-      border-radius: 999px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .zic-aka {
-      font-size: 10px;
-      font-style: italic;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .zic-desc {
-      font-size: 11px;
-      line-height: 1.5;
-      color: var(--text-steel);
-      margin-top: 6px;
-    }
-
-    .zic-section {
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border-whisper);
-    }
-
-    .zic-section:last-child {
-      border-bottom: none;
-    }
-
-    .zic-section-title {
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--accent-maroon);
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      margin-bottom: 6px;
-    }
-
-    .zic-section-title i {
-      font-size: 12px;
-    }
-
-    .zic-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .zic-list li {
-      font-size: 11px;
-      color: var(--text-steel);
-      line-height: 1.4;
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-    }
-
-    .zic-list li::before {
-      content: '';
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: var(--accent-gold);
-      flex-shrink: 0;
-      margin-top: 5px;
-    }
-
-    /* Scale wrapper to fit viewport while maintaining aspect */
-    .map-scaler {
-      position: relative;
-      transform-origin: 0 0;
-      transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-      will-change: transform;
-    }
-
-    /* Floating controls on map */
-    .map-float {
-      position: absolute;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .map-float--tl {
-      top: 18px;
-      left: 18px;
-    }
-
-    .map-float--br {
-      bottom: 18px;
-      right: 18px;
-      align-items: flex-end;
-    }
-
-    .float-btn {
-      background: var(--bg-glass);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid var(--border-whisper);
-      border-radius: var(--radius-sm);
-      padding: 8px 14px;
-      font-family: var(--font-sans);
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-ink);
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-      transition: var(--spring);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .float-btn:hover {
-      border-color: var(--accent-maroon);
-      color: var(--accent-maroon);
-    }
-
-    .float-btn.hidden {
-      opacity: 0;
-      transform: translateY(-4px);
-      pointer-events: none;
-    }
-
-    /* How-to card */
-    .howto-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-whisper);
-      border-radius: var(--radius-md);
-      padding: 20px;
-      width: 280px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
-      margin-top: 8px;
-      opacity: 0;
-      transform: translateY(6px);
-      pointer-events: none;
-      transition: var(--spring);
-    }
-
-    .howto-card.show {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-
-    .howto-card h4 {
-      font-family: var(--font-serif);
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      color: var(--accent-maroon);
-    }
-
-    .howto-card ul {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .howto-card li {
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--text-steel);
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-    }
-
-    .howto-card li::before {
-      content: '';
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--accent-gold);
-      margin-top: 5px;
-      flex-shrink: 0;
-    }
-
-    /* --- 4. COLLAPSIBLE DIRECTORY PANEL --- */
-    .panel-toggle {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      transform: translateX(-100%) translateY(-50%);
-      z-index: 40;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-whisper);
-      border-right: none;
-      border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-      padding: 12px 10px;
-      cursor: pointer;
-      box-shadow: -4px 4px 16px rgba(0, 0, 0, 0.06);
-      transition: var(--spring);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-steel);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .panel-toggle:hover {
-      color: var(--accent-maroon);
-      padding-right: 14px;
-    }
-
-    .panel-toggle i {
-      font-size: 16px;
-      transition: transform 0.3s ease;
-    }
-
-    .panel-toggle.open i {
-      transform: rotate(180deg);
-    }
-
-    .side-panel {
-      position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: var(--panel-w);
-      background: var(--bg-panel);
-      border-left: 1px solid var(--border-whisper);
-      box-shadow: -8px 0 40px rgba(0, 0, 0, 0.06);
-      z-index: 35;
-      display: flex;
-      flex-direction: column;
-      transform: translateX(100%);
-      transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .side-panel.open {
-      transform: translateX(0);
-    }
-
-    @media(max-width:1024px) {
-      .side-panel {
-        width: 100vw;
-      }
-    }
-
-    /* Panel header */
-    .panel-header {
-      padding: 18px 18px 12px;
-      flex-shrink: 0;
-      border-bottom: 1px solid var(--border-whisper);
-    }
-
-    .panel-header h2 {
-      font-family: var(--font-serif);
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 10px;
-      color: var(--text-ink);
-    }
-
-    /* Search */
-    .search-wrap {
-      position: relative;
-      margin-bottom: 10px;
-    }
-
-    .search-wrap i {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      font-size: 15px;
-    }
-
-    .search-input {
-      width: 100%;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-whisper);
-      border-radius: 8px;
-      padding: 9px 12px 9px 36px;
-      color: var(--text-ink);
-      font-family: var(--font-sans);
-      font-size: 13px;
-      outline: none;
-      transition: var(--spring);
-    }
-
-    .search-input:focus {
-      border-color: var(--accent-maroon);
-      box-shadow: 0 0 0 3px rgba(124, 24, 24, 0.06);
-    }
-
-    .search-input::placeholder {
-      color: var(--text-muted);
-    }
-
-    /* Filter chips â€” horizontal scroll */
-    .filter-bar {
-      display: flex;
-      gap: 5px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      padding-bottom: 2px;
-    }
-
-    .filter-bar::-webkit-scrollbar {
-      display: none;
-    }
-
-    .filter-chip {
-      background: transparent;
-      border: 1px solid var(--border-whisper);
-      color: var(--text-steel);
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 10px;
-      font-weight: 600;
-      font-family: var(--font-sans);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .filter-chip:hover {
-      background: rgba(0, 0, 0, 0.03);
-      color: var(--text-ink);
-    }
-
-    .filter-chip.active {
-      background: var(--accent-maroon);
-      border-color: var(--accent-maroon);
-      color: #fff;
-    }
-
-    /* (Detail card removed â€” info shown via zoom-info-card on map) */
-
-    /* Location list */
-    .list-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 6px 18px 18px;
-    }
-
-    .list-scroll::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    .list-scroll::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.08);
-      border-radius: 4px;
-    }
-
-    .list-count {
-      font-size: 10px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 600;
-      padding: 8px 0 6px;
-    }
-
-    .location-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 8px;
-      border-radius: 8px;
-      cursor: pointer;
-      position: relative;
-      opacity: 0;
-      animation: staggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      transition: background 0.2s ease;
-    }
-
-    @keyframes staggerIn {
-      from {
-        opacity: 0;
-        transform: translateY(4px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .location-item:hover {
-      background: rgba(124, 24, 24, 0.03);
-    }
-
-    .location-item.active {
-      background: rgba(124, 24, 24, 0.05);
-    }
-
-    .location-item.active .loc-name {
-      color: var(--accent-maroon);
-    }
-
-    .loc-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.03);
-      border: 1px solid var(--border-whisper);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent-maroon);
-      font-size: 15px;
-      flex-shrink: 0;
-      transition: all 0.2s ease;
-    }
-
-    .location-item:hover .loc-icon,
-    .location-item.active .loc-icon {
-      background: rgba(124, 24, 24, 0.06);
-      border-color: rgba(124, 24, 24, 0.15);
-    }
-
-    .loc-meta {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .loc-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-ink);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      transition: color 0.2s ease;
-    }
-
-    .location-item:hover .loc-name {
-      color: var(--accent-maroon);
-    }
-
-    .loc-cat {
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-top: 1px;
-    }
-
-    .loc-arrow {
-      color: var(--text-muted);
-      font-size: 12px;
-      transition: all 0.2s ease;
-      opacity: 0;
-    }
-
-    .location-item:hover .loc-arrow,
-    .location-item.active .loc-arrow {
-      opacity: 1;
-      color: var(--accent-maroon);
-      transform: translateX(2px);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 30px 18px;
-      color: var(--text-muted);
-      font-size: 12px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUP Santa Mesa Campus - Interactive Map v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,700;1,6..72,400&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<style>
+
+/* --- 1. VARIABLES & RESET --- */
+:root{
+  --bg-canvas: #F7F6F3;
+  --bg-surface: #FFFFFF;
+  --bg-glass: rgba(255,255,255,0.72);
+  --border-whisper: #EAEAEA;
+  --border-subtle: rgba(0,0,0,0.06);
+  --text-ink: #1C1917;
+  --text-steel: #787774;
+  --text-muted: #A1A19A;
+  --accent-maroon: #7C1818;
+  --accent-maroon-light: #9E2A2A;
+  --accent-gold: #BFA045;
+  --accent-gold-bright: #D4AF37;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --transition-spring: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg-canvas);
+  color:var(--text-ink);
+  font-family:var(--font-sans);
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#D4D4D4;border-radius:3px}
+
+/* --- 2. HEADER (Minimal, Inline, Not a Bar) --- */
+.page-header{
+  max-width:1200px;
+  margin:0 auto;
+  width:100%;
+  padding:28px 24px 4px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.header-logo{
+  width:38px;height:38px;
+  border-radius:50%;
+  background:linear-gradient(135deg,var(--accent-maroon),#5a1010);
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--accent-gold);
+  flex-shrink:0;
+}
+.header-logo img{width:22px;height:22px;object-fit:contain;}
+.header-title{
+  font-family:var(--font-serif);
+  font-size:20px;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  line-height:1.2;
+  color:var(--text-ink);
+}
+.header-meta{
+  font-size:11px;
+  color:var(--text-steel);
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+  font-weight:500;
+}
+
+/* --- 3. MAIN ASYMMETRIC GRID --- */
+.app-grid{
+  flex:1;
+  max-width:1200px;
+  margin:0 auto;
+  width:100%;
+  padding:20px 24px 32px;
+  display:grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap:32px;
+  align-items:start;
+}
+@media(max-width:1024px){
+  .app-grid{grid-template-columns:1fr;padding:16px 16px 24px;gap:24px;}
+  .page-header{padding:20px 16px 4px;}
+}
+
+/* --- 4. MAP COLUMN --- */
+.map-column{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+  position:relative;
+}
+
+/* Double-Bezel Map Container */
+.map-bezel{
+  background:var(--bg-surface);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-lg);
+  padding:10px;
+  box-shadow:0 20px 60px -20px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.02);
+  transition:box-shadow 0.4s ease;
+}
+.map-bezel:hover{
+  box-shadow:0 24px 70px -20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.03);
+}
+.map-core{
+  position:relative;
+  width:100%;
+  aspect-ratio:1488 / 811;
+  overflow:hidden;
+  border-radius:var(--radius-md);
+  background:#EDECE8;
+  cursor:crosshair;
+}
+.map-stage{
+  position:absolute;
+  top:0;left:0;
+  width:1488px;height:811px;
+  transform-origin:0 0;
+  transition:transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change:transform;
+}
+.map-stage img{
+  position:absolute;top:0;left:0;
+  width:1488px;height:811px;
+  display:block;
+  pointer-events:auto;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.map-stage canvas{
+  position:absolute;top:0;left:0;
+  width:1488px;height:811px;
+  pointer-events:none;
+  z-index:2;
+}
+.map-stage map{position:absolute;top:0;left:0;z-index:3;}
+
+/* Floating Reset Button (appears when zoomed) */
+.reset-btn{
+  position:absolute;
+  top:18px;right:18px;
+  background:var(--bg-glass);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-sm);
+  padding:8px 14px;
+  font-family:var(--font-sans);
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-ink);
+  cursor:pointer;
+  opacity:0;
+  transform:translateY(-6px);
+  pointer-events:none;
+  transition:var(--transition-spring);
+  box-shadow:0 4px 12px rgba(0,0,0,0.04);
+  display:flex;align-items:center;gap:6px;
+}
+.reset-btn.visible{
+  opacity:1;
+  transform:translateY(0);
+  pointer-events:auto;
+}
+.reset-btn:hover{
+  border-color:var(--accent-gold);
+  color:var(--accent-maroon);
+}
+
+/* How-to Floating Card */
+.howto-wrap{
+  position:absolute;
+  bottom:18px;left:18px;
+  z-index:10;
+}
+.howto-trigger{
+  background:var(--bg-glass);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-sm);
+  padding:8px 14px;
+  font-family:var(--font-sans);
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-steel);
+  cursor:pointer;
+  transition:var(--transition-spring);
+  box-shadow:0 4px 12px rgba(0,0,0,0.04);
+}
+.howto-trigger:hover{
+  border-color:var(--accent-gold);
+  color:var(--text-ink);
+}
+.howto-card{
+  position:absolute;
+  bottom:calc(100% + 10px);
+  left:0;
+  width:260px;
+  background:var(--bg-surface);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-md);
+  padding:16px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.08);
+  opacity:0;
+  transform:translateY(8px);
+  pointer-events:none;
+  transition:var(--transition-spring);
+}
+.howto-card.show{
+  opacity:1;
+  transform:translateY(0);
+  pointer-events:auto;
+}
+.howto-card h4{
+  font-family:var(--font-serif);
+  font-size:15px;
+  font-weight:700;
+  margin-bottom:10px;
+  color:var(--accent-maroon);
+}
+.howto-card ul{
+  list-style:none;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.howto-card li{
+  font-size:12px;
+  line-height:1.5;
+  color:var(--text-steel);
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+.howto-card li::before{
+  content:'';
+  width:5px;height:5px;
+  border-radius:50%;
+  background:var(--accent-gold);
+  margin-top:5px;
+  flex-shrink:0;
+}
+.howto-close{
+  position:absolute;
+  top:8px;right:10px;
+  background:none;border:none;
+  color:var(--text-muted);
+  cursor:pointer;font-size:14px;
+}
+
+/* --- 5. DIRECTORY COLUMN --- */
+.directory-column{
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+  min-height:0;
+}
+.dir-header{
+  padding-bottom:4px;
+}
+.dir-header h2{
+  font-family:var(--font-serif);
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  line-height:1.2;
+  margin-bottom:6px;
+}
+.dir-header p{
+  font-size:13px;
+  line-height:1.5;
+  color:var(--text-steel);
+  max-width:36ch;
+}
+
+/* Search */
+.search-wrap{
+  position:relative;
+}
+.search-wrap i{
+  position:absolute;
+  left:14px;top:50%;transform:translateY(-50%);
+  color:var(--text-muted);font-size:16px;
+}
+.search-input{
+  width:100%;
+  background:var(--bg-surface);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-sm);
+  padding:12px 14px 12px 42px;
+  color:var(--text-ink);
+  font-family:var(--font-sans);
+  font-size:14px;
+  outline:none;
+  transition:var(--transition-spring);
+}
+.search-input:focus{
+  border-color:var(--accent-maroon);
+  box-shadow:0 0 0 4px rgba(124,24,24,0.06);
+}
+.search-input::placeholder{color:var(--text-muted);}
+
+/* Filter Chips */
+.filter-bar{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.filter-chip{
+  background:transparent;
+  border:1px solid var(--border-whisper);
+  color:var(--text-steel);
+  padding:6px 14px;
+  border-radius:var(--radius-sm);
+  font-size:12px;
+  font-weight:600;
+  font-family:var(--font-sans);
+  cursor:pointer;
+  transition:var(--transition-spring);
+}
+.filter-chip:hover{
+  background:rgba(0,0,0,0.02);
+  color:var(--text-ink);
+}
+.filter-chip.active{
+  background:var(--accent-maroon);
+  border-color:var(--accent-maroon);
+  color:#fff;
+}
+
+/* Detail Card (Liquid Glass) */
+.detail-card{
+  background:var(--bg-glass);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-md);
+  padding:18px;
+  min-height:140px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 4px 20px rgba(0,0,0,0.03);
+}
+.detail-card::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,0.6);
+  pointer-events:none;
+}
+.detail-empty{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  gap:10px;
+  color:var(--text-muted);
+  min-height:104px;
+}
+.detail-empty i{font-size:26px;color:rgba(0,0,0,0.08);}
+.detail-empty p{font-size:12px;line-height:1.5;max-width:220px;}
+.detail-body{display:none;flex-direction:column;gap:10px;}
+.detail-body.show{display:flex;animation:fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+.detail-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.detail-name{
+  font-family:var(--font-serif);
+  font-size:19px;
+  font-weight:700;
+  line-height:1.2;
+  color:var(--text-ink);
+}
+.detail-badge{
+  background:rgba(124,24,24,0.08);
+  border:1px solid rgba(124,24,24,0.15);
+  color:var(--accent-maroon);
+  font-size:9px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  padding:3px 10px;
+  border-radius:999px;
+  white-space:nowrap;
+  flex-shrink:0;
+}
+.detail-desc{
+  font-size:12.5px;
+  line-height:1.6;
+  color:var(--text-steel);
+}
+.detail-block{
+  background:rgba(0,0,0,0.02);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-sm);
+  padding:10px 12px;
+}
+.detail-block h5{
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:0.1em;
+  color:var(--accent-maroon);
+  font-weight:700;
+  margin-bottom:6px;
+  display:flex;align-items:center;gap:6px;
+}
+.detail-block ul{
+  list-style:none;
+  display:flex;flex-direction:column;gap:4px;
+}
+.detail-block li{
+  font-size:12px;
+  color:var(--text-steel);
+  display:flex;align-items:center;gap:6px;
+}
+.detail-block li::before{
+  content:'';
+  width:4px;height:4px;
+  border-radius:50%;
+  background:var(--accent-gold);
+  flex-shrink:0;
+}
+
+/* Location List (Editorial Hairlines) */
+.list-scroll{
+  flex:1;
+  overflow-y:auto;
+  min-height:0;
+}
+.location-item{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:14px 0;
+  border-bottom:1px solid var(--border-whisper);
+  cursor:pointer;
+  position:relative;
+  opacity:0;
+  animation:staggerIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards;
+  transition:padding 0.25s ease, background 0.25s ease;
+}
+@keyframes staggerIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.location-item:hover{
+  padding-left:8px;
+  background:rgba(0,0,0,0.01);
+}
+.location-item::before{
+  content:'';
+  position:absolute;
+  left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:0;
+  background:var(--accent-maroon);
+  border-radius:2px;
+  transition:height 0.3s cubic-bezier(0.16,1,0.3,1);
+}
+.location-item:hover::before,
+.location-item.active::before{
+  height:24px;
+}
+.location-item.active .loc-name{color:var(--accent-maroon);}
+
+.loc-icon{
+  width:34px;height:34px;
+  border-radius:var(--radius-sm);
+  background:rgba(0,0,0,0.03);
+  border:1px solid var(--border-whisper);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--accent-maroon);
+  font-size:18px;
+  flex-shrink:0;
+  transition:var(--transition-spring);
+}
+.location-item:hover .loc-icon{
+  background:rgba(124,24,24,0.04);
+  border-color:rgba(124,24,24,0.12);
+}
+.loc-meta{flex:1;min-width:0;}
+.loc-name{
+  font-size:14px;
+  font-weight:600;
+  color:var(--text-ink);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  transition:color 0.2s ease;
+}
+.location-item:hover .loc-name{color:var(--accent-maroon);}
+.loc-cat{
+  font-size:11px;
+  color:var(--text-muted);
+  margin-top:2px;
+  text-transform:capitalize;
+}
+.loc-arrow{
+  color:var(--text-muted);
+  font-size:14px;
+  transition:var(--transition-spring);
+}
+.location-item:hover .loc-arrow{
+  color:var(--accent-maroon);
+  transform:translateX(3px);
+}
+.empty-state{
+  text-align:center;
+  padding:40px 20px;
+  color:var(--text-muted);
+  font-size:13px;
+}
+
+/* --- 6. FOOTER --- */
+.app-footer{
+  max-width:1200px;
+  margin:0 auto;
+  width:100%;
+  padding:16px 24px 24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  border-top:1px solid var(--border-whisper);
+}
+.app-footer p{
+  font-size:11px;
+  color:var(--text-muted);
+}
+.ai-link{
+  background:none;
+  border:none;
+  font-family:var(--font-sans);
+  font-size:11px;
+  color:var(--text-steel);
+  cursor:pointer;
+  text-decoration:underline;
+  text-decoration-color:var(--border-whisper);
+  text-underline-offset:3px;
+  transition:var(--transition-spring);
+}
+.ai-link:hover{color:var(--accent-maroon);text-decoration-color:var(--accent-maroon);}
+.ai-statement{
+  display:none;
+  position:absolute;
+  bottom:60px;right:24px;
+  width:300px;
+  background:var(--bg-surface);
+  border:1px solid var(--border-whisper);
+  border-radius:var(--radius-md);
+  padding:16px;
+  font-size:12px;
+  line-height:1.6;
+  color:var(--text-steel);
+  box-shadow:0 20px 50px rgba(0,0,0,0.08);
+  z-index:50;
+}
+.ai-statement.show{display:block;animation:fadeUp 0.3s ease both;}
+
+/* Mobile */
+@media(max-width:1024px){
+  .app-footer{padding:14px 16px 20px;flex-direction:column;align-items:flex-start;gap:8px;}
+  .ai-statement{bottom:80px;right:16px;left:16px;width:auto;}
+}
+</style>
 </head>
-
 <body>
 
-  <!-- ===================== MAIN STAGE ===================== -->
-  <main class="main-stage" id="main-stage">
+<!-- ===================== HEADER ===================== -->
+<header class="page-header">
+  <div class="header-logo">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2e/Polytechnic_University_of_the_Philippines.svg" alt="PUP">
+  </div>
+  <div>
+    <div class="header-title">Polytechnic University of the Philippines</div>
+    <div class="header-meta">Santa Mesa Campus Interactive Directory</div>
+  </div>
+</header>
 
-    <!-- Map Hero -->
-    <div class="map-hero" id="map-hero">
+<!-- ===================== MAIN ===================== -->
+<main class="app-grid">
 
-      <!-- ===================== HEADER ===================== -->
-      <header class="page-header" id="page-header">
-        <div class="header-brand">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2e/Polytechnic_University_of_the_Philippines.svg"
-            alt="PUP Logo">
-          <div class="header-text">
-            <h1>Polytechnic University of the Philippines</h1>
-            <span>Santa Mesa Campus Interactive Vicinity Map</span>
-          </div>
-        </div>
-        <div class="header-actions">
-          <button class="float-btn" onclick="toggleHowTo()">
-            <i class="ph ph-question"></i> How to use
-          </button>
-          <div class="howto-card" id="howto-card">
-            <h4>How to use</h4>
-            <ul>
-              <li><span><strong>Hover</strong> over any building on the map to preview details and see a soft highlight.</span></li>
-              <li><span><strong>Click</strong> a building on the map or in the directory to zoom in and lock focus.</span></li>
-              <li><span>Use the <strong>Directory</strong> panel on the right to search, filter, and browse all locations.</span></li>
-            </ul>
-          </div>
-        </div>
-      </header>
+  <!-- MAP COLUMN -->
+  <section class="map-column">
+    <div class="map-bezel">
       <div class="map-core" id="map-core">
-        <div class="map-bg"></div>
-        <div class="map-scaler" id="map-scaler">
-          <img id="campus-img" src="stamesa.jpg" width="1488" height="811"
-            usemap="#campus-map" alt="PUP Santa Mesa Campus Map" draggable="false">
+        <div class="map-stage" id="map-stage">
+          <img id="campus-img" src="https://www.pup.edu.ph/resources/images/maps/stamesa.jpg" width="1488" height="811" usemap="#campus-map" alt="PUP Santa Mesa Campus Map" draggable="false">
           <canvas id="highlight-canvas" width="1488" height="811"></canvas>
           <map name="campus-map" id="campus-map"></map>
         </div>
-        <div class="map-tooltip" id="map-tooltip"></div>
-      </div>
-
-      <!-- Floating controls -->
-
-      <div class="map-float map-float--br">
-        <button class="float-btn hidden" id="reset-btn" onclick="resetView()">
+        <button class="reset-btn" id="reset-btn" onclick="resetView()">
           <i class="ph ph-arrows-out"></i> Reset View
         </button>
       </div>
-
-      <!-- Zoom info card (inside map viewport, shown when zoomed in) -->
-      <div class="zoom-info-card" id="zoom-info-card"></div>
     </div>
 
-    <!-- Side Panel -->
-    <aside class="side-panel" id="side-panel">
-      <!-- Toggle hangs off the left edge of the panel -->
-      <button class="panel-toggle" id="panel-toggle" onclick="togglePanel()">
-        <i class="ph ph-caret-left"></i>
-        <span>Directory</span>
-      </button>
-      <div class="panel-header">
-        <h2>Directory</h2>
-        <div class="search-wrap">
-          <i class="ph ph-magnifying-glass"></i>
-          <input type="text" id="search-input" class="search-input" placeholder="Search buildings, offices..."
-            oninput="filterLocations()">
-        </div>
-        <div class="filter-bar" id="filter-bar">
-          <button class="filter-chip active" data-cat="All" onclick="setCategory('All',this)">All</button>
-          <button class="filter-chip" data-cat="Academic" onclick="setCategory('Academic',this)">Academic</button>
-          <button class="filter-chip" data-cat="Administrative"
-            onclick="setCategory('Administrative',this)">Admin</button>
-          <button class="filter-chip" data-cat="Landmarks" onclick="setCategory('Landmarks',this)">Landmarks</button>
-          <button class="filter-chip" data-cat="Sports & Recreation"
-            onclick="setCategory('Sports & Recreation',this)">Sports</button>
-          <button class="filter-chip" data-cat="Utility & Support"
-            onclick="setCategory('Utility & Support',this)">Utilities</button>
-        </div>
+    <!-- How-to -->
+    <div class="howto-wrap">
+      <button class="howto-trigger" onclick="toggleHowTo()">How to use</button>
+      <div class="howto-card" id="howto-card">
+        <button class="howto-close" onclick="toggleHowTo()"><i class="ph ph-x"></i></button>
+        <h4>How to use this map</h4>
+        <ul>
+          <li><strong>Hover</strong> over any building on the map to preview details and see a soft highlight.</li>
+          <li><strong>Click</strong> a building on the map or in the directory to zoom in and lock focus.</li>
+          <li>Use <strong>search</strong> and <strong>category filters</strong> to browse the directory quickly.</li>
+        </ul>
       </div>
+    </div>
+  </section>
 
-      <div class="list-scroll" id="location-list"></div>
-    </aside>
-  </main>
+  <!-- DIRECTORY COLUMN -->
+  <aside class="directory-column">
+    <div class="dir-header">
+      <h2>Campus Directory</h2>
+      <p>Explore buildings, offices, and student services across the Santa Mesa campus.</p>
+    </div>
 
-  <script>
-    
-    const CampusRegistry = [
-      { "id": "pylon", "label": "The Pylon", "shape": "poly", "coords": "1075,588,1111,578,1078,554,1041,564", "category": "Landmarks", "aka": "PUP Pylon / Main Gate Monument", "description": "The iconic three-pillar structure at the main entrance, symbolizing the university's three pillars: Instruction, Research, and Community Service.", "offices": [], "services": ["Visitor Inquiry", "Campus Entry Point"] },
-      { "id": "mural", "label": "The Mural", "shape": "poly", "coords": "1033,606,1017,587,1012,590,1017,611", "category": "Landmarks", "aka": "PUP Mural Wall", "description": "A monumental bas-relief artwork depicting the history, struggles, and aspirations of the Filipino student movement and PUP academic community.", "offices": [], "services": [] },
-      { "id": "oval", "label": "Oval", "shape": "poly", "coords": "613,513,718,518,781,523,839,540,867,554,892,573,908,598,907,619,903,642,880,658,843,669,805,681,772,687,720,689,590,680,585,662,507,658,499,672,390,667,308,663,250,653,222,642,215,615,216,593,227,568,254,545,300,525,329,516,365,509,401,503,433,503,606,513", "category": "Sports & Recreation", "aka": "PUP Freedom Oval / Track Oval", "description": "The university's athletic track and field, used for physical education classes, varsity training, sports events, and graduation ceremonies.", "offices": ["Physical Education Department"], "services": ["Athletic Track", "Outdoor PE Classes", "Sports Events", "Graduation Ceremonies"] },
-      { "id": "mab", "label": "Main Academic Building", "shape": "poly", "coords": "510,419,492,426,446,420,446,410,401,400,365,393,346,390,331,391,295,395,162,420,141,421,139,414,125,413,114,394,105,345,121,342,120,337,122,336,118,315,138,308,132,304,274,264,331,273,333,284,349,262,363,262,365,257,415,258,416,263,426,267,433,303,426,314,539,333,533,339,546,341,549,384,554,396,512,419", "category": "Academic", "aka": "MAB", "description": "The primary academic structure housing classrooms, administrative offices, and multiple college programs. Contains offices of university executive officials.", "offices": ["Office of the University President", "Office of the VP for Academic Affairs", "Office of the University Registrar", "College of Science", "College of Business Administration"], "services": ["Enrollment Services", "Transcript Requests", "Academic Counseling", "Classroom Instruction"] },
-      { "id": "mpb", "label": "Multi-Purpose Building", "shape": "poly", "coords": "1150,490,1184,480,1184,475,1163,465,1163,435,1189,426,1220,415,1239,414,1251,413,1092,349,1066,347,1044,351,1026,359,1009,368,995,379,994,408", "category": "Utility & Support", "aka": "MPB", "description": "Indoor facility used for convocations, student assemblies, cultural events, examinations, and recreational activities.", "offices": ["Events Management Office"], "services": ["Venue Booking", "Student Assemblies", "PE Practicums", "Socio-Cultural Events"] },
-      { "id": "chapel", "label": "Inter-Faith Chapel", "shape": "poly", "coords": "348,483,393,467,413,443,412,428,393,417,371,412,346,411,326,409,308,402,297,400,290,401,276,414,261,417,243,421,219,427,200,437,190,450,186,460,189,473,224,488,278,490,347,486", "category": "Landmarks", "aka": "Interfaith Chapel", "description": "A sanctuary for reflection and spiritual growth open to students and staff of all religious denominations.", "offices": ["Campus Ministry Office"], "services": ["Worship Services", "Spiritual Counseling", "Quiet Reflection"] },
-      { "id": "gsb", "label": "Gabriela Silang Building", "shape": "poly", "coords": "425,763,473,752,466,745,463,716,473,714,458,692,441,692,426,694,410,696,411,730,406,733,414,745,413,750", "category": "Academic", "aka": "GSB / Education Building", "description": "Named after the revolutionary heroine, this building houses the College of Education and related programs.", "offices": ["College of Education Dean's Office"], "services": ["Teacher Education Programs", "Practice Teaching", "Classroom Lectures"] },
-      { "id": "grandstand", "label": "Grandstand", "shape": "poly", "coords": "629,502,636,495,693,502,699,491,696,488,698,483,698,460,560,454,549,463,557,466,552,479,547,479,544,488,545,492,601,495,602,501", "category": "Sports & Recreation", "aka": "PUP Grandstand", "description": "The spectator pavilion overlooking the Oval, used as the viewing area for athletic competitions and university assemblies.", "offices": ["PE Equipment Office"], "services": ["Spectator Seating", "PE Equipment Checkout", "Sports Events"] },
-      { "id": "nalrc", "label": "Ninoy Aquino Learning Resource Center", "shape": "poly", "coords": "656,334,724,307,804,319,839,314,842,262,824,259,824,237,779,229,609,278,609,321", "category": "Academic", "aka": "NALLRC / Main Library", "description": "The university's main library system holding thousands of volumes, electronic resources, the PUP Archives, and the Heritage Museum.", "offices": ["University Library Administration", "PUP Archives and Heritage Museum", "Digital Learning Center"], "services": ["Book Borrowing & Returns", "Thesis Research Access", "E-Library Terminals", "Heritage Museum Tours"] },
-      { "id": "cdr", "label": "Charlie Del Rosario Building", "shape": "poly", "coords": "496,295,554,295,564,241,542,233,515,236,496,273", "category": "Administrative", "aka": "CDR / Student Development Center", "description": "The student development center and seat of the PUP Central Student Council. Named after student activist Charlie del Rosario.", "offices": ["PUP Central Student Council (CSC)", "Office of Student Affairs and Services (OSAS)", "Student Publications (The Catalyst)"], "services": ["Student Grievance Support", "Scholarship Applications", "Organization Accreditation"] },
-      { "id": "hk", "label": "Human Kinetics Building", "shape": "poly", "coords": "876,338,804,352,787,336,786,323,795,321,839,316,875,309,935,299,950,309,942,311,930,304,875,313,875,319", "category": "Sports & Recreation", "aka": "HK Building / PUP Gym", "description": "Home of the College of Human Kinetics (CHK), housing indoor sports courts and facilities for physical education and varsity training.", "offices": ["CHK Dean's Office", "Sports Development Office", "Sports Clinic"], "services": ["PE Classes", "Varsity Training", "Intramural Games"] },
-      { "id": "alumni", "label": "Tahanan ng Alumni", "shape": "poly", "coords": "892,346,951,335,947,315,928,307,878,314,878,342", "category": "Administrative", "aka": "Alumni House", "description": "The official alumni association building, managing alumni relations, reunions, and alumni-funded scholarships.", "offices": ["Alumni Relations Office", "Federation of PUP Alumni Associations (FPUPAAI)"], "services": ["Alumni Card Registration", "Alumni Scholarships", "Reunion Coordination"] },
-      { "id": "pool", "label": "Swimming Pool", "shape": "poly", "coords": "991,405,991,376,1013,361,1025,355,1042,349,1050,347,984,318,964,320,959,322,960,337,930,341,906,347,901,352,904,366,956,388", "category": "Sports & Recreation", "aka": "PUP Swimming Pool", "description": "Outdoor swimming facility used for PE swimming courses, varsity training, and aquatic competitions.", "offices": ["CHK Aquatics Office"], "services": ["Swimming PE Classes", "Varsity Swim Training", "Water Safety Drills"] },
-      { "id": "obelisk", "label": "Obelisk", "shape": "poly", "coords": "757,408,773,401,773,394,768,389,759,384,745,383,739,383,739,344,736,341,730,341,729,346,731,385,719,385,707,387,702,391,697,399,697,405,710,415,732,416,745,416,759,412,764,411,770,405,771,404", "category": "Landmarks", "aka": "The Obelisk / Mabini Plaza Obelisk", "description": "A central monument in Mabini Plaza symbolizing the aspirations of the PUP community. A major historical campus landmark.", "offices": [], "services": [] },
-      { "id": "eab", "label": "Engineering and Architecture Building", "shape": "poly", "coords": "1079,125,1126,125,1127,100,1124,88,1105,87,1093,87,1077,86,1070,86,1071,121,1078,125", "category": "Academic", "aka": "EA Building (NDC Compound)", "description": "Located in the NDC Compound, this building houses classrooms, drafting rooms, and laboratories for the College of Engineering and College of Architecture and Fine Arts.", "offices": ["College of Engineering Dean's Office", "College of Architecture and Fine Arts (CAFA) Dean's Office"], "services": ["Engineering Labs", "Drafting Rooms", "Architecture Thesis Reviews"] },
-      { "id": "condotel", "label": "Condotel", "shape": "poly", "coords": "946,83,949,75,979,76,995,74,1000,74,999,49,987,41,977,35,965,36,963,41,956,42,942,40,937,40,935,68,936,76", "category": "Administrative", "aka": "Hasmin Hostel / PUP Hasmin Condotel", "description": "The hostel and training facility of the College of Tourism, Hospitality and Transportation Management (CTHTM), located in the M.H. Del Pilar campus area.", "offices": ["CTHTM Dean's Office", "Condotel Booking Office"], "services": ["Hostel Accommodation", "Hospitality Practicum", "Event Venue Booking"] },
-      { "id": "itb", "label": "Information Technology Building", "shape": "poly", "coords": "1249,96,1227,94,1214,78,1184,81,1165,79,1161,79,1161,65,1161,58,1173,55,1196,58,1224,58,1246,57,1254,67,1256,77,1248,81", "category": "Academic", "aka": "IT Building / CCIS Building (NDC Compound)", "description": "Home of the College of Computer and Information Sciences (CCIS), containing computer laboratories, networking facilities, and IT academic wings. Located in the NDC Compound.", "offices": ["CCIS Dean's Office", "PUP ICT Office", "IT Department Office"], "services": ["Computer Lab Access", "Network Support", "Software Training"] },
-      { "id": "bpo", "label": "Business Processing Office", "shape": "poly", "coords": "1210,121,1272,122,1275,114,1271,107,1260,99,1237,99,1221,101,1209,101,1200,101", "category": "Utility & Support", "aka": "BPO Building (NDC Compound)", "description": "An operations support building in the NDC Compound facilitating auxiliary services and industry partnerships.", "offices": ["Auxiliary Services Division"], "services": ["Internship Placement", "Corporate Partnerships"] },
-      { "id": "lhs", "label": "Laboratory High School Building", "shape": "poly", "coords": "636,257,635,240,698,244,708,244,705,198,701,193,696,192,665,192,613,193,607,193,605,197,597,199,590,198,581,220,582,254", "category": "Academic", "aka": "LHS Building / PUP Lab High", "description": "A junior and senior high school facility serving as the laboratory training center for College of Education students.", "offices": ["LHS Principal's Office", "LHS Faculty Office"], "services": ["High School Enrollment", "Student Teaching Coordination"] },
-      { "id": "fnb", "label": "Food and Nutrition Building", "shape": "poly", "coords": "133,510,163,500,159,471,130,421,119,409,108,406,100,407,89,408,82,412", "category": "Academic", "aka": "FNB", "description": "Academic building for food chemistry, nutrition, dietetics, and cooking science laboratory practices.", "offices": ["Department of Nutrition and Dietetics", "Food Technology Faculty Office"], "services": ["Food Tech Labs", "Kitchen Laboratory"] },
-      { "id": "gazebo1", "label": "Gazebo", "shape": "poly", "coords": "420,489,425,496,436,495,463,492,489,487,502,487,510,483,509,476,505,471,497,471,488,471,470,475,460,472,454,475,449,479,440,479,428,477,422,477,417,484", "category": "Landmarks", "aka": "Mabini Plaza Gazebo", "description": "An outdoor pavilion where students gather for group discussions, study sessions, and relaxation.", "offices": [], "services": ["Study Area", "Rest Zone"] },
-      { "id": "gazebo2", "label": "Gazebo", "shape": "poly", "coords": "78,401,96,397,98,383,84,365,74,363,59,367,76,402", "category": "Landmarks", "aka": "West Wing Gazebo", "description": "An outdoor study area in the west wing providing a quiet garden space for studying and small group reviews.", "offices": [], "services": ["Quiet Study Spot"] },
-      { "id": "opencourt", "label": "Open Court", "shape": "poly", "coords": "1114,572,1186,546,1080,485,1021,497,981,508,1010,524,1033,517", "category": "Sports & Recreation", "aka": "Mabini Open Courts", "description": "Outdoor sports courts used for tennis, badminton, and general athletic activities.", "offices": [], "services": ["Open Play Courts", "PE Classes", "Badminton & Tennis"] },
-      { "id": "tennis", "label": "Lawn Tennis Court", "shape": "poly", "coords": "974,501,1078,478,991,426,889,454", "category": "Sports & Recreation", "aka": "", "description": "Dedicated court facility for lawn tennis training and PE classes.", "offices": [], "services": ["Tennis PE Classes", "Varsity Training"] },
-      { "id": "basketball", "label": "Basketball Court", "shape": "poly", "coords": "967,428,902,390,820,412,887,452", "category": "Sports & Recreation", "aka": "Mabini Basketball Courts", "description": "Outdoor basketball courts for PE classes, campus leagues, and recreational play.", "offices": [], "services": ["Basketball PE Classes", "Campus Liga", "Recreational Play"] },
-      { "id": "souvenir", "label": "Souvenir Shop", "shape": "poly", "coords": "792,483,826,478,817,468,789,446,773,456,775,475", "category": "Utility & Support", "aka": "PUP Souvenir Shop", "description": "The official university retail store selling PUP uniforms, merchandise, and academic supplies.", "offices": [], "services": ["Official Merchandise", "Uniform Fittings", "Graduation Cap & Gown"] },
-      { "id": "lagoon", "label": "Lagoon Park & Commercial Spaces", "shape": "poly", "coords": "607,320,605,292,596,288,567,297,541,306,521,313,530,327,543,329,543,334,553,343,552,365,580,372,619,375,645,374,683,371,727,365,726,344,727,337,736,336,743,336,743,366,753,362,751,338,754,324,739,318,723,327,707,337,674,342,650,343,606,321", "category": "Utility & Support", "aka": "PUP Lagoon / Lagoon Kiosks", "description": "A scenic lagoon surrounded by student pavilions, food stalls, cooperatives, and study benches.", "offices": [], "services": ["Food Stalls", "Student Cooperatives", "Outdoor Study Area"] },
-      { "id": "nftrdc", "label": "Nutrition & Food Technology Research and Development Center Building", "shape": "poly", "coords": "875,306,925,298,933,297,931,282,865,253,843,260,842,300,868,307", "category": "Academic", "aka": "NFTRDC", "description": "A research building dedicated to food preservation technology, dietary innovation, and nutritional analysis.", "offices": ["Nutrition Research Laboratory"], "services": ["Food Preservation Research", "Dietary Product Analysis"] },
-      { "id": "studentcenter", "label": "Student Center", "shape": "poly", "coords": "452,294,490,295,492,286,494,275,486,267,480,263,469,263,462,267,452,286", "category": "Utility & Support", "aka": "", "description": "Hub for accredited student organizations, committee rooms, and co-curricular coordination.", "offices": ["Student Organization Secretariat"], "services": ["Organization Office Space", "Student Assembly Hosting"] },
-      { "id": "sampaguita", "label": "Sampaguita Building", "shape": "poly", "coords": "443,290,455,266,454,257,445,246,439,239,431,241,416,243,408,248,404,253,417,254,420,261,426,261,431,265,433,293", "category": "Academic", "aka": "", "description": "Academic annex building for general education subjects and introductory courses.", "offices": [], "services": ["General Subject Lectures"] },
-      { "id": "amphitheater", "label": "Amphitheater", "shape": "poly", "coords": "522,327,510,308,468,318", "category": "Landmarks", "aka": "PUP Amphitheater", "description": "An outdoor auditorium for theatrical performances, concerts, forums, and graduation preparations.", "offices": [], "services": ["Outdoor Stage Events", "Theatrical Performances", "Student Forums"] },
-      { "id": "atleta", "label": "Tahanan ng Atleta", "shape": "poly", "coords": "534,726,585,727,582,665,506,661,494,688,495,721", "category": "Sports & Recreation", "aka": "Athletes' Residence", "description": "Residence and training facility for PUP varsity athletes, providing boarding and athletic support.", "offices": ["CHK Varsity Housing Office"], "services": ["Athlete Boarding", "Athletic Wellness"] },
-      { "id": "fountain", "label": "Fountain Park", "shape": "poly", "coords": "474,469,509,467,543,464,545,452,546,441,536,427,527,428,507,432,493,435,474,432,465,433,442,438,437,442,433,452,427,458,423,464,423,466,439,467,463,467", "category": "Landmarks", "aka": "Mabini Fountain Park", "description": "A manicured park around the main water fountain of Mabini Plaza, a peaceful spot for relaxation.", "offices": [], "services": ["Rest Area", "Photography Spot"] },
-      { "id": "esrc", "label": "Engineering and Science Research Center", "shape": "poly", "coords": "1161,499,1212,525,1304,497,1314,435,1305,431,1305,415,1283,405,1264,409,1236,419,1203,426,1182,431,1176,433,1167,436,1166,464,1188,473,1187,482,1187,488,1164,494", "category": "Academic", "aka": "ESRC (NDC Compound)", "description": "A state-of-the-art research facility in the NDC Compound for engineering, sciences, and postgraduate research.", "offices": ["Center for Science and Technology Research", "Research Management Office"], "services": ["Science Labs", "Patent Applications", "Postgrad Thesis Defense"] },
-      { "id": "ndccourt", "label": "NDC Covered Court", "shape": "poly", "coords": "1129,115,1183,115,1183,97,1181,87,1145,89,1126,88,1128,97,1129,106", "category": "Sports & Recreation", "aka": "NDC Gym", "description": "Indoor basketball and volleyball court in the NDC Compound, used by engineering and architecture students for PE and intramurals.", "offices": [], "services": ["PE Classes", "College Intramurals"] },
-      { "id": "communication", "label": "Communication Building", "shape": "poly", "coords": "1057,166,1092,147,1094,137,1087,129,1068,137,1059,143,1049,140,1038,134,1029,135,1003,150,1000,163", "category": "Academic", "aka": "COC Building (NDC Compound)", "description": "Home of the College of Communication (COC) in the NDC Compound, housing DZMC Radio, broadcast studios, journalism labs, and advertising workshops.", "offices": ["COC Dean's Office", "DZMC Radio Station"], "services": ["Broadcast Studio Access", "Journalism Labs", "COC Academic Counseling"] },
-      { "id": "theater", "label": "PUP Theater", "shape": "poly", "coords": "1058,140,1079,130,1081,128,1076,127,1070,124,1069,119,1062,118,1053,115,1041,118,1033,122,1023,126,1023,133,1030,130,1037,130,1042,132,1052,135", "category": "Landmarks", "aka": "PUP MassCom Theater", "description": "A performance auditorium in the NDC Compound used for cultural plays, dramatic arts, and speech communication workshops.", "offices": [], "services": ["Cultural Performances", "Drama Auditions", "Theater Venue Booking"] },
-      { "id": "antique", "label": "Antique House", "shape": "poly", "coords": "1128,78,1154,78,1153,65,1124,67", "category": "Landmarks", "aka": "PUP Heritage Center", "description": "A preserved historical house showcasing classic colonial Filipino residential architecture, serving as a living heritage museum on campus.", "offices": [], "services": ["Heritage Exhibits", "Architectural Studies"] }
-    ];
+    <div class="search-wrap">
+      <i class="ph ph-magnifying-glass"></i>
+      <input type="text" id="search-input" class="search-input" placeholder="Search buildings, offices, or services..." oninput="filterLocations()">
+    </div>
 
-    
-    const MAP_W = 1488;
-    const MAP_H = 811;
-    const state = {
-      activeId: null,
-      hoveredId: null,
-      locked: false,
-      category: 'All',
-      query: '',
-      scale: 1,
-      tx: 0,
-      ty: 0,
-      isDragging: false,
-      dragStartX: 0,
-      dragStartY: 0,
-      dragStartTx: 0,
-      dragStartTy: 0,
-      panelOpen: false
-    };
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-chip active" data-cat="All" onclick="setCategory('All',this)">All</button>
+      <button class="filter-chip" data-cat="Academic" onclick="setCategory('Academic',this)">Academic</button>
+      <button class="filter-chip" data-cat="Administrative" onclick="setCategory('Administrative',this)">Admin</button>
+      <button class="filter-chip" data-cat="Landmarks" onclick="setCategory('Landmarks',this)">Landmarks</button>
+      <button class="filter-chip" data-cat="Sports & Recreation" onclick="setCategory('Sports & Recreation',this)">Sports</button>
+      <button class="filter-chip" data-cat="Utility & Support" onclick="setCategory('Utility & Support',this)">Utilities</button>
+    </div>
 
-    const els = {
-      pageHeader: document.getElementById('page-header'),
-      mapHero: document.getElementById('map-hero'),
-      mapCore: document.getElementById('map-core'),
-      mapScaler: document.getElementById('map-scaler'),
-      canvas: document.getElementById('highlight-canvas'),
-      ctx: document.getElementById('highlight-canvas').getContext('2d'),
-      mapImg: document.getElementById('campus-img'),
-      mapElem: document.getElementById('campus-map'),
-      panel: document.getElementById('side-panel'),
-      panelToggle: document.getElementById('panel-toggle'),
-      resetBtn: document.getElementById('reset-btn'),
-      list: document.getElementById('location-list'),
-      search: document.getElementById('search-input'),
-      howto: document.getElementById('howto-card')
-    };
+    <div class="detail-card" id="detail-card">
+      <div class="detail-empty" id="detail-empty">
+        <i class="ph ph-map-pin"></i>
+        <p>Select a location from the map or directory to view details and available services.</p>
+      </div>
+      <div class="detail-body" id="detail-body"></div>
+    </div>
 
-    
-    document.addEventListener('DOMContentLoaded', () => {
-      buildMapAreas();
-      filterLocations();
-      fitMapToViewport();
-      requestAnimationFrame(() => resetView(false));
-    });
+    <div class="list-scroll" id="location-list"></div>
+  </aside>
+</main>
 
-    function buildMapAreas() {
-      els.mapElem.innerHTML = '';
-      CampusRegistry.forEach(loc => {
-        const area = document.createElement('area');
-        area.shape = loc.shape;
-        area.coords = loc.coords;
-        area.alt = loc.label;
-        area.addEventListener('mouseenter', () => handleMapHover(loc));
-        area.addEventListener('mouseleave', () => handleMapOut());
-        area.addEventListener('click', (e) => { e.preventDefault(); selectLocation(loc); });
-        els.mapElem.appendChild(area);
-      });
-    }
+<!-- ===================== FOOTER ===================== -->
+<footer class="app-footer" style="position:relative;">
+  <p>CMPE 364 - Web & Mobile Systems &middot; Activity 06</p>
+  <button class="ai-link" onclick="toggleAi()">AI Use Declaration</button>
+  <div class="ai-statement" id="ai-statement">
+    <strong style="color:var(--accent-maroon);">AI Use Statement</strong><br><br>
+    This interactive campus map was designed and built with assistance from Antigravity AI.
+    It is implemented in vanilla HTML5, CSS3, and JavaScript with no external frameworks.
+    Interactivity uses native HTML &lt;map&gt;/&lt;area&gt; tags, a canvas overlay for soft glow
+    highlights, and CSS transforms for spring-physics zoom animations.
+  </div>
+</footer>
 
-    
-    function fitMapToViewport() {
-      const core = els.mapCore;
-      
-      const panelW = state.panelOpen ? 360 + 16 : 0;
-      const pw = window.innerWidth - 48 - 20 - panelW;  /* stage padding + hero padding */
+<script>
+/* ========================================================================
+   CAMPUS REGISTRY DATA
+   ======================================================================== */
+const CampusRegistry = [
+  {"id":"pylon","label":"The Pylon","shape":"poly","coords":"1075,588,1111,578,1078,554,1041,564","category":"Landmarks","description":"The iconic three-pillar pylon standing proudly at the main entrance, representing the PUP logo and symbolizing the pillars of quality instruction, research, and community service.","offices":["Security and Safety Office (Main Gate)"],"services":["Visitor Inquiry","Campus Entry Coordination","Campus Landmarks Photo Ops"]},
+  {"id":"mural","label":"The Mural","shape":"poly","coords":"1033,606,1017,587,1012,590,1017,611","category":"Landmarks","description":"A monumental bas-relief artwork depicting the history, struggles, aspirations, and social consciousness of the PUP academic community and the Filipino student movement.","offices":["Cultural and Sports Development Office"],"services":["Art History Orientation","Guided Cultural Exhibits","Campus Historical Studies"]},
+  {"id":"oval","label":"PUP Freedom Oval","shape":"poly","coords":"613,513,718,518,781,523,839,540,867,554,892,573,908,598,907,619,903,642,880,658,843,669,805,681,772,687,720,689,590,680,585,662,507,658,499,672,390,667,308,663,250,653,222,642,215,615,216,593,227,568,254,545,300,525,329,516,365,509,401,503,433,503,606,513","category":"Sports & Recreation","description":"A standard athletic track and field system serving as the physical education hub, playground of varsity athletes, and venue for grand graduation rites.","offices":["Varsity Athletics Training Office","Physical Education Department Office"],"services":["Athletic Track Training","Outdoor Drills","Sports Event Hosting","Graduation Ceremonies"]},
+  {"id":"mab","label":"Main Academic Building","shape":"poly","coords":"510,419,492,426,446,420,446,410,401,400,365,393,346,390,331,391,295,395,162,420,141,421,139,414,125,413,114,394,105,345,121,342,120,337,122,336,118,315,138,308,132,304,274,264,331,273,333,284,349,262,363,262,365,257,415,258,416,263,426,267,433,303,426,314,539,333,533,339,546,341,549,384,554,396,512,419","category":"Academic","description":"The primary academic structure of the university. This massive wing contains classrooms, administrative offices, and serves as the learning hub for multiple colleges.","offices":["Office of the University President","Office of the Vice President for Academic Affairs","Office of the University Registrar","College of Science (CS)","College of Business Administration (CBA)"],"services":["Admissions and Enrollment Services","Transcript and Diploma Requests","Academic Consultation and Counseling","General Classroom Instruction"]},
+  {"id":"mpb","label":"Multi-Purpose Building","shape":"poly","coords":"1150,490,1184,480,1184,475,1163,465,1163,435,1189,426,1220,415,1239,414,1251,413,1092,349,1066,347,1044,351,1026,359,1009,368,995,379,994,408","category":"Utility & Support","description":"An indoor activity structure used for socio-cultural events, large convocations, student gatherings, examinations, and physical recreation.","offices":["Student Organizations Affairs Division","Events Management Secretariat"],"services":["Venue Booking","Student Organization Assemblies","Physical Education Practicums","Socio-Cultural Festivals"]},
+  {"id":"chapel","label":"Inter-Faith Chapel","shape":"poly","coords":"348,483,393,467,413,443,412,428,393,417,371,412,346,411,326,409,308,402,297,400,290,401,276,414,261,417,243,421,219,427,200,437,190,450,186,460,189,473,224,488,278,490,347,486","category":"Landmarks","description":"A sanctuary for reflection and spiritual growth catering to students and staff of diverse religious denominations, promoting peace and spiritual unity.","offices":["Chapel Pastoral Office","Student Campus Ministry"],"services":["Ecumenical Worship Services","Inter-faith Dialogue","Spiritual Counseling","Quiet Reflection and Prayer"]},
+  {"id":"gsb","label":"Gabriela Silang Building","shape":"poly","coords":"425,763,473,752,466,745,463,716,473,714,458,692,441,692,426,694,410,696,411,730,406,733,414,745,413,750","category":"Academic","description":"A dedicated academic building named after the revolutionary heroine, housing the College of Education, high school laboratory lecture halls, and humanities classes.","offices":["College of Education Dean's Office","Department of Elementary and Secondary Education","Curriculum Development Center"],"services":["Teacher Education Programs","Practice Teaching Supervision","Classroom Lectures"]},
+  {"id":"grandstand","label":"Grandstand","shape":"poly","coords":"629,502,636,495,693,502,699,491,696,488,698,483,698,460,560,454,549,463,557,466,552,479,547,479,544,488,545,492,601,495,602,501","category":"Sports & Recreation","description":"The primary spectator pavilion overlooking the PUP Freedom Oval. Serves as the central viewing area for athletic competitions and grand university assemblies.","offices":["Physical Education Equipment Hub","Athletics Logistics Office"],"services":["Spectator Seating","PE Equipment Checkout","Sports Coordination Center","Public Address Control"]},
+  {"id":"nalrc","label":"Ninoy Aquino Learning Resource Center (Main Library)","shape":"poly","coords":"656,334,724,307,804,319,839,314,842,262,824,259,824,237,779,229,609,278,609,321","category":"Academic","description":"The intellectual epicenter of the campus, holding over thousands of volumes of references, journals, electronic resources, the university archives, and a media laboratory.","offices":["University Library Administration Office","PUP Archives and Heritage Museum","Digital Learning Center Office"],"services":["Book Borrowing and Returns","Academic Thesis Research Access","Electronic Lab Terminals","PUP Memorabilia Tours"]},
+  {"id":"cdr","label":"Charlie Del Rosario Building","shape":"poly","coords":"496,295,554,295,564,241,542,233,515,236,496,273","category":"Administrative","description":"The central headquarters of student service agencies and the seat of the PUP Central Student Council (CSC), named in honor of activist Charlie Del Rosario.","offices":["PUP Central Student Council (CSC)","Office of Student Affairs and Services (OSAS)","Student Publications Office (The Catalyst)"],"services":["Student Council Grievance and Support","Student Publication Submissions","Scholarship and Financial Aid Applications","Student Organization Accreditation"]},
+  {"id":"hk","label":"Human Kinetics Building (Gymnasium)","shape":"poly","coords":"876,338,804,352,787,336,786,323,795,321,839,316,875,309,935,299,950,309,942,311,930,304,875,313,875,319","category":"Sports & Recreation","description":"Home of the College of Human Kinetics (CHK), hosting indoor sports courts, gymnastics gyms, and facilities dedicated to physical education and training.","offices":["Office of the CHK Dean","PUP Sports and Varsity Development Department","Gymnasium Sports Clinic"],"services":["Physical Education Classes","Varsity Basketball and Volleyball Training","Intramural Games","P.E. Uniform Inquiries"]},
+  {"id":"alumni","label":"Tahanan ng Alumni","shape":"poly","coords":"892,346,951,335,947,315,928,307,878,314,878,342","category":"Administrative","description":"The official building dedicated to the alumni association, housing files, holding reunions, and managing scholarships funded by alumni groups.","offices":["PUP Alumni Relations Office","Federation of PUP Alumni Associations Inc. (FPUPAAI)"],"services":["PUP Alumni Card Registration","Alumni Scholarship Applications","Graduate Network Services","Reunion Coordination"]},
+  {"id":"pool","label":"Olympic Swimming Pool","shape":"poly","coords":"991,405,991,376,1013,361,1025,355,1042,349,1050,347,984,318,964,320,959,322,960,337,930,341,906,347,901,352,904,366,956,388","category":"Sports & Recreation","description":"An Olympic-sized outdoor swimming facility supporting swimming courses, aquatic competitions, and basic water safety drills.","offices":["CHK Aquatics Training Office","PUP Swim Varsity Hub"],"services":["Swimming Instruction (P.E.)","Varsity Swim Training","Water Safety Certifications","Aquatic Meets Hosting"]},
+  {"id":"obelisk","label":"The Obelisk","shape":"poly","coords":"757,408,773,401,773,394,768,389,759,384,745,383,739,383,739,344,736,341,730,341,729,346,731,385,719,385,707,387,702,391,697,399,697,405,710,415,732,416,745,416,759,412,764,411,770,405,771,404","category":"Landmarks","description":"A magnificent central obelisk constructed in PUP Mabini Plaza, embodying the high aspirations of the PUP community and standing as a major historical landmark.","offices":["University Heritage Council"],"services":["PUP Historical Lectures","University Commemorative Events","Plaza Student Studies"]},
+  {"id":"eab","label":"Engineering and Architecture Building","shape":"poly","coords":"1079,125,1126,125,1127,100,1124,88,1105,87,1093,87,1077,86,1070,86,1071,121,1078,125","category":"Academic","description":"Located within the NDC Compound, this building hosts the classrooms, specialized drafting rooms, and structural laborites for the College of Engineering and Architecture.","offices":["College of Engineering (CEA) Dean's Office","College of Architecture and Fine Arts (CAFA) Dean's Office","CEA Student Council Office"],"services":["Engineering Laboratory Access","Drafting and Modeling Room Coordination","Architecture Thesis Review","College Academic Consultation"]},
+  {"id":"condotel","label":"PUP Hasmin Condotel","shape":"poly","coords":"946,83,949,75,979,76,995,74,1000,74,999,49,987,41,977,35,965,36,963,41,956,42,942,40,937,40,935,68,936,76","category":"Administrative","description":"The hostel and professional training environment of the College of Tourism, Hospitality and Transportation Management (CTHTM), simulating actual lodging operations.","offices":["CTHTM Dean's Office","Hasmin Condotel Booking Office","Hotel Management Training Center"],"services":["Hostel Room Accommodation","Hospitality Practicum Training","Event Venue Booking","Tourism Industry Placement"]},
+  {"id":"itb","label":"Information Technology Building","shape":"poly","coords":"1249,96,1227,94,1214,78,1184,81,1165,79,1161,79,1161,65,1161,58,1173,55,1196,58,1224,58,1246,57,1254,67,1256,77,1248,81","category":"Academic","description":"Home of the College of Computer and Information Sciences (CCIS), containing state-of-the-art computer labs, networking hubs, and IT academic wings.","offices":["CCIS Dean's Office","PUP ICT Office","Information Technology Department Office"],"services":["Computer Laboratory Access","University Network Support","CCIS Academic Consultation","Software Development Training"]},
+  {"id":"bpo","label":"Business Processing Office Building","shape":"poly","coords":"1210,121,1272,122,1275,114,1271,107,1260,99,1237,99,1221,101,1209,101,1200,101","category":"Utility & Support","description":"An operations support building facilitating corporate transactions, university auxiliary services, and industry partnership offices.","offices":["Auxiliary Services Division","Industry Liaison Office"],"services":["Industry Internship Placement","Corporate Partnerships Inquiries","University Auxiliary Registrations"]},
+  {"id":"lhs","label":"Laboratory High School Building","shape":"poly","coords":"636,257,635,240,698,244,708,244,705,198,701,193,696,192,665,192,613,193,607,193,605,197,597,199,590,198,581,220,582,254","category":"Academic","description":"A prestigious junior and senior high school facility serving as the laboratory training center for the College of Education students undergoing teacher residency.","offices":["PUP Laboratory High School Principal's Office","LHS Faculty Secretariat","LHS Student Council"],"services":["High School Enrolment Inquiries","Teacher-Student Apprenticeship Coordination","Student Academic Advising"]},
+  {"id":"fnb","label":"Food and Nutrition Building","shape":"poly","coords":"133,510,163,500,159,471,130,421,119,409,108,406,100,407,89,408,82,412","category":"Academic","description":"Academic classroom facility built for laboratory practices in food chemistry, domestic operations, cooking sciences, and industrial hospitality.","offices":["Department of Nutrition and Dietetics","Department of Food Technology Faculty Office"],"services":["Food Technology Labs Checkouts","Kitchen Laboratory Coordination","Academic Consultation"]},
+  {"id":"gazebo1","label":"Mabini Plaza Student Gazebo (Main)","shape":"poly","coords":"420,489,425,496,436,495,463,492,489,487,502,487,510,483,509,476,505,471,497,471,488,471,470,475,460,472,454,475,449,479,440,479,428,477,422,477,417,484","category":"Landmarks","description":"A beautiful hexagonal outdoor pavilion where students gather to review, hold group discussions, relax, and organize academic committees.","offices":["Campus Grounds Council"],"services":["Group Discussion Spaces","Student Organization Study Gatherings","Outdoor Rest Zone"]},
+  {"id":"gazebo2","label":"West Wing Student Gazebo","shape":"poly","coords":"78,401,96,397,98,383,84,365,74,363,59,367,76,402","category":"Landmarks","description":"An outdoor study hut situated in the west compound, providing a quiet garden space for studying, reviewing, and mini-discussion group sessions.","offices":["Campus Grounds Council"],"services":["Quiet Reading Spots","Small Team Review Sessions","Garden Rest Area"]},
+  {"id":"opencourt","label":"Mabini Plaza Open Court","shape":"poly","coords":"1114,572,1186,546,1080,485,1021,497,981,508,1010,524,1033,517","category":"Sports & Recreation","description":"Outdoor sports court system housing facilities for tennis, badminton, and outdoor athletic activities.","offices":["Sports Logistics Center"],"services":["Open Play Courts Checkout","PE Class Sports","Badminton and Tennis Play"]},
+  {"id":"tennis","label":"Lawn Tennis Court","shape":"poly","coords":"974,501,1078,478,991,426,889,454","category":"Sports & Recreation","description":"Dedicated double-court facility for lawn tennis training, physical education, and hosting intra-school athletic meets.","offices":["PUP Tennis Varsity Division"],"services":["Tennis Instruction (P.E.)","Varsity Tennis Team Training","Tournament Hosting"]},
+  {"id":"basketball","label":"Mabini Basketball Courts","shape":"poly","coords":"967,428,902,390,820,412,887,452","category":"Sports & Recreation","description":"Two outdoor concrete basketball courts serving as general sports instruction fields, campus leagues, and recreational shoot-arounds.","offices":["Basketball Varsity Logistics Office"],"services":["Basketball P.E. Classes","Campus Liga Events","Student Recreational Shooting"]},
+  {"id":"souvenir","label":"PUP Souvenir Shop","shape":"poly","coords":"792,483,826,478,817,468,789,446,773,456,775,475","category":"Utility & Support","description":"The official university retail store, selling PUP uniforms, merchandise, jackets, commemorative memorabilia, and academic supplies.","offices":["University Business Services Office (Shop Staff)"],"services":["Official Merchandise Purchase","School Uniform Fittings","Graduation Cap & Gown Pickups"]},
+  {"id":"lagoon","label":"PUP Lagoon Park & Kiosks","shape":"poly","coords":"607,320,605,292,596,288,567,297,541,306,521,313,530,327,543,329,543,334,553,343,552,365,580,372,619,375,645,374,683,371,727,365,726,344,727,337,736,336,743,336,743,366,753,362,751,338,754,324,739,318,723,327,707,337,674,342,650,343,606,321","category":"Utility & Support","description":"A scenic lake environment surrounded by student pavilions, affordable food stalls, student cooperatives, and peaceful study benches.","offices":["Lagoon Sanitation and Grounds Division"],"services":["Cooperative Canteens","Outdoor Group Studies","Recreational Rest Zones","Student Cooperative Outlets"]},
+  {"id":"nftrdc","label":"Nutrition & Food Tech R&D Center","shape":"poly","coords":"875,306,925,298,933,297,931,282,865,253,843,260,842,300,868,307","category":"Academic","description":"A research-oriented building dedicated to chemical analysis of nutrition, research and development of food preservation technology, and dietary innovations.","offices":["Food R&D Board of Trustees","Nutrition Research Laboratory"],"services":["Food Preservation Testing","Dietary Product Analysis","Graduate Research Consults"]},
+  {"id":"studentcenter","label":"Student Center","shape":"poly","coords":"452,294,490,295,492,286,494,275,486,267,480,263,469,263,462,267,452,286","category":"Utility & Support","description":"Social and academic hub housing offices for officially accredited student organizations, review boards, and committee assembly spaces.","offices":["Student Organization Secretariat Office"],"services":["Organization Office Allotment","Co-curricular Coordination","Student Assembly Hosting"]},
+  {"id":"sampaguita","label":"Sampaguita Building","shape":"poly","coords":"443,290,455,266,454,257,445,246,439,239,431,241,416,243,408,248,404,253,417,254,420,261,426,261,431,265,433,293","category":"Academic","description":"Academic classroom annex building hosting lectures for under-graduate general subjects and introductory laboratory systems.","offices":["PUP General Studies Faculty Wing"],"services":["General Subject Classroom Lectures","Academic Remedial Programs"]},
+  {"id":"amphitheater","label":"PUP Amphitheater","shape":"poly","coords":"522,327,510,308,468,318","category":"Landmarks","description":"An outdoor auditorium layout designed for creative theater acts, massive university concerts, graduation preparations, and general public forums.","offices":["PUP Cultural Center Board"],"services":["Outdoor Stage Venue Bookings","Theatrical Presentations","Student Forum Hosting"]},
+  {"id":"atleta","label":"Tahanan ng Atleta (Athletes Residence)","shape":"poly","coords":"534,726,585,727,582,665,506,661,494,688,495,721","category":"Sports & Recreation","description":"Residence facility and gym center hosting official PUP varsity athletes, providing boarding, meals, and athletic planning areas.","offices":["CHK Varsity Housing Office"],"services":["Varsity Athlete Boarding","Athletic Wellness Clinics","Dietary and Nutritional Planning"]},
+  {"id":"fountain","label":"Mabini Plaza Fountain Park","shape":"poly","coords":"474,469,509,467,543,464,545,452,546,441,536,427,527,428,507,432,493,435,474,432,465,433,442,438,437,442,433,452,427,458,423,464,423,466,439,467,463,467","category":"Landmarks","description":"A beautifully manicured park situated around the main water fountain of Mabini Plaza, presenting a very peaceful environment for relaxation and academic dialogue.","offices":["PUP Campus Landscaping Services"],"services":["Outdoor Relaxation Grounds","Photography Permits","Quiet Study Circles"]},
+  {"id":"esrc","label":"Engineering and Science Research Center (ESRC)","shape":"poly","coords":"1161,499,1212,525,1304,497,1314,435,1305,431,1305,415,1283,405,1264,409,1236,419,1203,426,1182,431,1176,433,1167,436,1166,464,1188,473,1187,482,1187,488,1164,494","category":"Academic","description":"A state-of-the-art research facility located in the NDC Compound, hosting advanced research centers for engineering, basic sciences, and postgraduate thesis defenses.","offices":["Center for Science and Technology Research","PUP Research Management Office (RMO)","Post-Graduate Studies Laboratory Secretariat"],"services":["Advanced Scientific Testing Labs Access","Intellectual Property / Patent Applications","Postgraduate Dissertation Defense Coordination"]},
+  {"id":"ndccourt","label":"NDC Covered Court","shape":"poly","coords":"1129,115,1183,115,1183,97,1181,87,1145,89,1126,88,1128,97,1129,106","category":"Sports & Recreation","description":"An indoor basketball and volleyball court complex located in the NDC Compound, serving engineering students for physical activities and college sport matches.","offices":["CEA Physical Activities Directorate"],"services":["P.E. Classes Coordination","CEA Intramurals Venue","Varsity Training Extensions"]},
+  {"id":"communication","label":"College of Communication Building","shape":"poly","coords":"1057,166,1092,147,1094,137,1087,129,1068,137,1059,143,1049,140,1038,134,1029,135,1003,150,1000,163","category":"Academic","description":"Home of the College of Communication (COC), housing training radio stations, mock TV studios, journalism newsrooms, and advertising labs.","offices":["COC Dean's Office","PUP DZMC Radio Office (91.1 FM)","PUP COC Student Council Hub"],"services":["DZMC Studio Access","Journalism and Broadcasting Labs Checkout","COC Academic Counseling"]},
+  {"id":"theater","label":"PUP Creative Theater","shape":"poly","coords":"1058,140,1079,130,1081,128,1076,127,1070,124,1069,119,1062,118,1053,115,1041,118,1033,122,1023,126,1023,133,1030,130,1037,130,1042,132,1052,135","category":"Landmarks","description":"A professional black-box theater and performance auditorium hosting cultural works, dramatic arts, speech communication workshops, and university drama guilds.","offices":["PUP Cultural Center - Theater Secretariat","PUP Bagong Sikat Theater Guild Office"],"services":["Cultural Plays Performance Hub","Drama Audition Registrations","Theater Venue Booking"]},
+  {"id":"antique","label":"PUP Antique House (Heritage Center)","shape":"poly","coords":"1128,78,1154,78,1153,65,1124,67","category":"Landmarks","description":"A meticulously preserved historical house relocating classic colonial Filipino residential architecture to the campus, serving as a living museum of local heritage.","offices":["Heritage Studies Committee"],"services":["Guided Heritage Exhibits","Colonial Architectural Studies","Cultural History Seminars"]}
+];
 
-      const headerHeight = els.pageHeader ? els.pageHeader.offsetHeight + 12 : 62;
-      const ph = window.innerHeight - 48 - 20 - headerHeight;  /* padding + header height */
-      const aspect = MAP_W / MAP_H;
-      let w, h;
-      if (pw / ph > aspect) {
-        h = ph;
-        w = ph * aspect;
-      } else {
-        w = pw;
-        h = pw / aspect;
-      }
-      core.style.width = Math.max(0, w) + 'px';
-      core.style.height = Math.max(0, h) + 'px';
-    }
+/* ========================================================================
+   STATE & CONFIG
+   ======================================================================== */
+const MAP_W = 1488;
+const MAP_H = 811;
+const state = {
+  activeId: null,
+  hoveredId: null,
+  locked: false,
+  category: 'All',
+  query: '',
+  scale: 1,
+  tx: 0,
+  ty: 0,
+  isDragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  dragStartTx: 0,
+  dragStartTy: 0
+};
 
-    
-    function getViewport() {
-      const r = els.mapCore.getBoundingClientRect();
-      return { w: r.width, h: r.height };
-    }
+const els = {
+  mapCore: document.getElementById('map-core'),
+  mapStage: document.getElementById('map-stage'),
+  canvas: document.getElementById('highlight-canvas'),
+  ctx: document.getElementById('highlight-canvas').getContext('2d'),
+  mapImg: document.getElementById('campus-img'),
+  mapElem: document.getElementById('campus-map'),
+  resetBtn: document.getElementById('reset-btn'),
+  list: document.getElementById('location-list'),
+  search: document.getElementById('search-input'),
+  detailEmpty: document.getElementById('detail-empty'),
+  detailBody: document.getElementById('detail-body'),
+  howto: document.getElementById('howto-card'),
+  aiStatement: document.getElementById('ai-statement')
+};
 
-    function resetView(animate = true) {
-      state.locked = false;
-      state.activeId = null;
-      state.hoveredId = null;
-      clearHighlight();
-      fitMapToViewport();
-      const v = getViewport();
-      /* Container matches image aspect ratio, so this fills exactly */
-      const s = v.w / MAP_W;
-      state.scale = s;
-      state.baseScale = s;
-      state.tx = 0;
-      state.ty = 0;
-      applyTransform(animate);
-      resetDetail();
-      updateListActive();
-      els.resetBtn.classList.add('hidden');
-      hideTooltip();
-      hideZoomInfoCard();
-    }
+/* ========================================================================
+   INIT
+   ======================================================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  buildMapAreas();
+  filterLocations();
+  requestAnimationFrame(() => resetView(false));
+});
 
-    function isZoomed() {
-      return state.baseScale && state.scale > state.baseScale * 1.02;
-    }
+function buildMapAreas() {
+  els.mapElem.innerHTML = '';
+  CampusRegistry.forEach(loc => {
+    const area = document.createElement('area');
+    area.shape = loc.shape;
+    area.coords = loc.coords;
+    area.alt = loc.label;
+    area.href = 'javascript:void(0);';
+    area.addEventListener('mouseenter', () => handleMapHover(loc));
+    area.addEventListener('mouseleave', () => handleMapOut());
+    area.addEventListener('click', (e) => { e.preventDefault(); selectLocation(loc); });
+    els.mapElem.appendChild(area);
+  });
+}
 
-    function selectLocation(loc) {
-      /* Toggle: clicking the active location again resets the view */
-      if (state.activeId === loc.id) {
-        resetView(true);
-        return;
-      }
-      state.hoveredId = null;
-      state.locked = true;
-      state.activeId = loc.id;
-      highlightLocation(loc, true);
-      showDetail(loc);
-      updateListActive();
-      zoomToLocation(loc);
-      els.resetBtn.classList.remove('hidden');
-      /* Show zoom info card for the selected building */
-      hideTooltip();
-      showZoomInfoCard(loc);
-    }
+/* ========================================================================
+   ZOOM / PAN ENGINE
+   ======================================================================== */
+function getViewport() {
+  const r = els.mapCore.getBoundingClientRect();
+  return { w: r.width, h: r.height };
+}
 
-    function zoomToLocation(loc) {
-      fitMapToViewport();
-      const v = getViewport();
-      const coords = loc.coords.split(',').map(Number);
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (let i = 0; i < coords.length; i += 2) {
-        minX = Math.min(minX, coords[i]);
-        minY = Math.min(minY, coords[i + 1]);
-        maxX = Math.max(maxX, coords[i]);
-        maxY = Math.max(maxY, coords[i + 1]);
-      }
-      /* Tight zoom â€” location fills nearly the entire viewport */
-      const bw = Math.max(80, maxX - minX);
-      const bh = Math.max(80, maxY - minY);
-      const pad = 1.15;
-      const s = Math.min(v.w / (bw * pad), v.h / (bh * pad));
-      const clamped = Math.min(Math.max(s, 0.5), 4.0);
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-      state.scale = clamped;
-      state.tx = v.w / 2 - cx * clamped;
-      state.ty = v.h / 2 - cy * clamped;
-      applyTransform(true);
-    }
+function resetView(animate = true) {
+  state.locked = false;
+  state.activeId = null;
+  clearHighlight();
+  const v = getViewport();
+  const s = Math.min(v.w / MAP_W, v.h / MAP_H) * 0.95;
+  state.scale = s;
+  state.tx = (v.w - MAP_W * s) / 2;
+  state.ty = (v.h - MAP_H * s) / 2;
+  applyTransform(animate);
+  resetDetail();
+  updateListActive();
+  els.resetBtn.classList.remove('visible');
+}
 
-    function applyTransform(animate) {
-      if (!animate) els.mapScaler.style.transition = 'none';
-      /* transform-origin is 0 0, so translate then scale works correctly */
-      els.mapScaler.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
-      if (!animate) {
-        els.mapScaler.offsetHeight;
-        els.mapScaler.style.transition = '';
-      }
-    }
+function selectLocation(loc) {
+  state.locked = true;
+  state.activeId = loc.id;
+  highlightLocation(loc, true);
+  showDetail(loc);
+  updateListActive();
+  zoomToLocation(loc);
+  els.resetBtn.classList.add('visible');
+}
 
-    
-    function clearHighlight() {
-      els.ctx.clearRect(0, 0, MAP_W, MAP_H);
-    }
+function zoomToLocation(loc) {
+  const v = getViewport();
+  const coords = loc.coords.split(',').map(Number);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < coords.length; i += 2) {
+    minX = Math.min(minX, coords[i]);
+    minY = Math.min(minY, coords[i+1]);
+    maxX = Math.max(maxX, coords[i]);
+    maxY = Math.max(maxY, coords[i+1]);
+  }
+  const pad = 1.45;
+  const bw = Math.max(1, maxX - minX);
+  const bh = Math.max(1, maxY - minY);
+  const s = Math.min(v.w / (bw * pad), v.h / (bh * pad));
+  const clamped = Math.min(Math.max(s, 0.5), 3.5);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  state.scale = clamped;
+  state.tx = v.w / 2 - cx * clamped;
+  state.ty = v.h / 2 - cy * clamped;
+  applyTransform(true);
+}
 
-    function highlightLocation(loc, sticky = false) {
-      clearHighlight();
-      const coords = loc.coords.split(',').map(Number);
-      const c = els.ctx;
+function applyTransform(animate) {
+  if (!animate) els.mapStage.style.transition = 'none';
+  els.mapStage.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+  if (!animate) {
+    els.mapStage.offsetHeight;
+    els.mapStage.style.transition = '';
+  }
+}
 
-      c.beginPath();
-      if (loc.shape === 'poly') {
-        
-        const pts = [];
-        for (let i = 0; i < coords.length; i += 2) pts.push({ x: coords[i], y: coords[i + 1] });
-        if (pts.length > 2) {
-          const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-          const m0 = mid(pts[pts.length - 1], pts[0]);
-          c.moveTo(m0.x, m0.y);
-          for (let i = 0; i < pts.length; i++) {
-            const next = pts[(i + 1) % pts.length];
-            const mp = mid(pts[i], next);
-            c.quadraticCurveTo(pts[i].x, pts[i].y, mp.x, mp.y);
-          }
-        } else {
-          c.moveTo(pts[0].x, pts[0].y);
-          for (let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
-        }
-        c.closePath();
-      } else if (loc.shape === 'rect') {
-        /* Round the rectangle corners */
-        const rx = coords[0], ry = coords[1], rw = coords[2] - coords[0], rh = coords[3] - coords[1];
-        const r = Math.min(8, rw / 4, rh / 4);
-        c.moveTo(rx + r, ry);
-        c.arcTo(rx + rw, ry, rx + rw, ry + rh, r);
-        c.arcTo(rx + rw, ry + rh, rx, ry + rh, r);
-        c.arcTo(rx, ry + rh, rx, ry, r);
-        c.arcTo(rx, ry, rx + rw, ry, r);
-        c.closePath();
-      } else if (loc.shape === 'circle') {
-        c.arc(coords[0], coords[1], coords[2], 0, Math.PI * 2);
-      }
+/* ========================================================================
+   CANVAS HIGHLIGHT (Soft, forgiving borders)
+   ======================================================================== */
+function clearHighlight() {
+  els.ctx.clearRect(0, 0, MAP_W, MAP_H);
+}
 
-      
+function highlightLocation(loc, sticky = false) {
+  clearHighlight();
+  const coords = loc.coords.split(',').map(Number);
+  const c = els.ctx;
 
-      const gold = [218, 165, 32];       // PUP Gold
-      const maroon = [136, 0, 0];        // PUP Maroon
+  c.beginPath();
+  if (loc.shape === 'poly') {
+    c.moveTo(coords[0], coords[1]);
+    for (let i = 2; i < coords.length; i += 2) c.lineTo(coords[i], coords[i+1]);
+    c.closePath();
+  } else if (loc.shape === 'rect') {
+    c.rect(coords[0], coords[1], coords[2]-coords[0], coords[3]-coords[1]);
+  } else if (loc.shape === 'circle') {
+    c.arc(coords[0], coords[1], coords[2], 0, Math.PI*2);
+  }
 
-      // 1. Wide outer glow â€” gold halo bleeds outward
-      c.save();
-      c.shadowBlur = 50;
-      c.shadowColor = sticky
-        ? `rgba(${gold},0.85)`
-        : `rgba(${gold},0.60)`;
-      c.strokeStyle = 'rgba(0,0,0,0.01)';
-      c.lineWidth = 24;
-      c.lineJoin = 'round';
-      c.lineCap = 'round';
-      c.stroke();
-      c.restore();
+  // 1. Ambient watercolor glow
+  c.save();
+  c.shadowBlur = 28;
+  c.shadowColor = sticky ? 'rgba(124,24,24,0.30)' : 'rgba(124,24,24,0.18)';
+  c.strokeStyle = 'rgba(124,24,24,0.01)';
+  c.lineWidth = 10;
+  c.stroke();
+  c.restore();
 
-      // 2. Inner maroon glow â€” adds depth
-      c.save();
-      c.shadowBlur = 22;
-      c.shadowColor = sticky
-        ? `rgba(${maroon},0.45)`
-        : `rgba(${maroon},0.30)`;
-      c.strokeStyle = 'rgba(0,0,0,0.01)';
-      c.lineWidth = 12;
-      c.lineJoin = 'round';
-      c.lineCap = 'round';
-      c.stroke();
-      c.restore();
+  // 2. Gold rim glow (soft)
+  c.save();
+  c.shadowBlur = 16;
+  c.shadowColor = sticky ? 'rgba(191,160,69,0.35)' : 'rgba(191,160,69,0.20)';
+  c.strokeStyle = 'rgba(191,160,69,0.01)';
+  c.lineWidth = 6;
+  c.stroke();
+  c.restore();
 
-      // 3. Gold fill â€” prominent, clearly marks the area
-      c.fillStyle = sticky
-        ? 'rgba(218,165,32,0.38)'
-        : 'rgba(218,165,32,0.25)';
-      c.fill();
+  // 3. Very light maroon fill
+  c.fillStyle = sticky ? 'rgba(124,24,24,0.10)' : 'rgba(124,24,24,0.05)';
+  c.fill();
 
-      // 4. Visible gold border â€” thick, round, soft (no sharp corners)
-      c.strokeStyle = sticky
-        ? 'rgba(218,165,32,0.80)'
-        : 'rgba(218,165,32,0.55)';
-      c.lineWidth = sticky ? 4 : 3;
-      c.lineJoin = 'round';
-      c.lineCap = 'round';
-      c.stroke();
-    }
+  // 4. Core stroke - soft, rounded
+  c.strokeStyle = sticky ? 'rgba(124,24,24,0.75)' : 'rgba(124,24,24,0.50)';
+  c.lineWidth = 2.5;
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+  c.stroke();
+}
 
-    
-    function handleMapHover(loc) {
-      if (state.locked) {
-        
-        if (isZoomed()) showZoomInfoCard(loc);
-        return;
-      }
-      state.hoveredId = loc.id;
-      highlightLocation(loc, false);
-      showDetail(loc);
-      updateListActive();
-      showTooltip(loc);
-    }
+/* ========================================================================
+   EVENT HANDLERS
+   ======================================================================== */
+function handleMapHover(loc) {
+  if (state.locked) return;
+  state.hoveredId = loc.id;
+  highlightLocation(loc, false);
+  showDetail(loc);
+  updateListActive();
+}
 
-    function handleMapOut() {
-      if (state.locked) {
-        /* When locked, hide the hover info card but keep locked state */
-        if (isZoomed()) {
-          /* Show the locked location's card as fallback */
-          const activeLoc = CampusRegistry.find(l => l.id === state.activeId);
-          if (activeLoc) showZoomInfoCard(activeLoc);
-        }
-        return;
-      }
-      state.hoveredId = null;
-      clearHighlight();
-      resetDetail();
-      updateListActive();
-      hideTooltip();
-      hideZoomInfoCard();
-    }
+function handleMapOut() {
+  if (state.locked) return;
+  state.hoveredId = null;
+  clearHighlight();
+  resetDetail();
+  updateListActive();
+}
 
-    /* Floating tooltip on map hover */
-    function showTooltip(loc) {
-      if (isZoomed()) {
-        /* When zoomed in, hide the small tooltip and show the info card instead */
-        hideTooltip();
-        showZoomInfoCard(loc);
-        return;
-      }
-      /* Default: float above the building in map-space, converted to viewport coords */
-      hideZoomInfoCard();
-      const tt = document.getElementById('map-tooltip');
-      const coords = loc.coords.split(',').map(Number);
-      tt.textContent = loc.label;
-      tt.classList.remove('fixed');
-      let sumX = 0, n = 0, minY = Infinity;
-      for (let i = 0; i < coords.length; i += 2) { sumX += coords[i]; n++; }
-      for (let i = 1; i < coords.length; i += 2) minY = Math.min(minY, coords[i]);
-      const cx = sumX / n;
-      /* Convert map coords to viewport coords using current transform */
-      const vx = cx * state.scale + state.tx;
-      const vy = minY * state.scale + state.ty - 30;
-      tt.style.left = vx + 'px';
-      tt.style.top = vy + 'px';
-      tt.style.transform = 'translateX(-50%)';
-      tt.classList.add('show');
-    }
+/* ========================================================================
+   SIDEBAR & DETAILS
+   ======================================================================== */
+function showDetail(loc) {
+  els.detailEmpty.style.display = 'none';
+  els.detailBody.classList.add('show');
 
-    function hideTooltip() {
-      const tt = document.getElementById('map-tooltip');
-      tt.classList.remove('show');
-      tt.classList.remove('fixed');
-    }
+  const officesHtml = loc.offices && loc.offices.length
+    ? `<div class="detail-block"><h5><i class="ph ph-buildings"></i> Offices & Departments</h5><ul>${loc.offices.map(o => `<li>${o}</li>`).join('')}</ul></div>`
+    : '';
+  const servicesHtml = loc.services && loc.services.length
+    ? `<div class="detail-block"><h5><i class="ph ph-handshake"></i> Student Services</h5><ul>${loc.services.map(s => `<li>${s}</li>`).join('')}</ul></div>`
+    : '';
 
-    
-    function showZoomInfoCard(loc) {
-      const card = document.getElementById('zoom-info-card');
+  els.detailBody.innerHTML = `
+    <div class="detail-head">
+      <div class="detail-name">${loc.label}</div>
+      <span class="detail-badge">${loc.category}</span>
+    </div>
+    <p class="detail-desc">${loc.description}</p>
+    ${officesHtml}
+    ${servicesHtml}
+  `;
+}
 
-      /* Build offices section */
-      const officesHtml = loc.offices && loc.offices.length
-        ? `<div class="zic-section">
-            <div class="zic-section-title"><i class="ph ph-buildings"></i> Offices & Departments</div>
-            <ul class="zic-list">${loc.offices.map(o => `<li>${o}</li>`).join('')}</ul>
-           </div>` : '';
+function resetDetail() {
+  els.detailEmpty.style.display = 'flex';
+  els.detailBody.classList.remove('show');
+  els.detailBody.innerHTML = '';
+}
 
-      /* Build services section */
-      const servicesHtml = loc.services && loc.services.length
-        ? `<div class="zic-section">
-            <div class="zic-section-title"><i class="ph ph-handshake"></i> Student Services</div>
-            <ul class="zic-list">${loc.services.map(s => `<li>${s}</li>`).join('')}</ul>
-           </div>` : '';
+function setCategory(cat, btn) {
+  state.category = cat;
+  document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterLocations();
+}
 
-      /* Build aka line */
-      const akaHtml = loc.aka ? `<div class="zic-aka">Also known as: ${loc.aka}</div>` : '';
+function filterLocations() {
+  state.query = els.search.value.trim().toLowerCase();
+  const filtered = CampusRegistry.filter(loc => {
+    const catMatch = state.category === 'All' || loc.category === state.category;
+    const q = state.query;
+    const qMatch = !q ||
+      loc.label.toLowerCase().includes(q) ||
+      loc.description.toLowerCase().includes(q) ||
+      loc.category.toLowerCase().includes(q) ||
+      loc.offices.some(o => o.toLowerCase().includes(q)) ||
+      loc.services.some(s => s.toLowerCase().includes(q));
+    return catMatch && qMatch;
+  });
+  renderList(filtered);
+}
 
-      card.innerHTML = `
-        <div class="zic-header">
-          <div class="zic-title-row">
-            <div class="zic-name">${loc.label}</div>
-            <span class="zic-badge">${loc.category}</span>
-          </div>
-          ${akaHtml}
-          <p class="zic-desc">${loc.description}</p>
-        </div>
-        ${officesHtml}
-        ${servicesHtml}
-      `;
-      card.classList.add('show');
-    }
+function renderList(items) {
+  els.list.innerHTML = '';
+  if (!items.length) {
+    els.list.innerHTML = '<div class="empty-state">No locations match your search.</div>';
+    return;
+  }
+  items.forEach((loc, idx) => {
+    const div = document.createElement('div');
+    div.className = 'location-item';
+    div.style.animationDelay = `${Math.min(idx * 45, 500)}ms`;
+    if (state.activeId === loc.id || state.hoveredId === loc.id) div.classList.add('active');
 
-    function hideZoomInfoCard() {
-      const card = document.getElementById('zoom-info-card');
-      card.classList.remove('show');
-    }
+    const iconClass = categoryIcon(loc.category);
 
-    
-    function togglePanel() {
-      state.panelOpen = !state.panelOpen;
-      els.panel.classList.toggle('open', state.panelOpen);
-      els.panelToggle.classList.toggle('open', state.panelOpen);
-      els.mapHero.classList.toggle('panel-open', state.panelOpen);
-
-      /* Smoothly refit map during the transition using rAF loop */
-      fitMapToViewport();
-      els.mapScaler.style.transition = 'none'; /* suppress scaler animation during refit */
-      let settled = false;
-      function tick() {
-        if (settled) return;
-        fitMapToViewport();
-        /* Keep scale/translate in sync if not zoomed */
-        if (!state.locked && !isZoomed()) {
-          const v = getViewport();
-          const s = v.w / MAP_W;
-          state.scale = s;
-          state.baseScale = s;
-          state.tx = 0;
-          state.ty = 0;
-          applyTransform(false);
-        }
-        requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
-
-      /* Stop loop after transition completes */
-      const onEnd = (e) => {
-        if (e.propertyName !== 'width') return;
-        settled = true;
-        els.mapCore.removeEventListener('transitionend', onEnd);
-        els.mapScaler.style.transition = ''; /* restore scaler transition */
-        fitMapToViewport();
-        if (!state.locked && !isZoomed()) {
-          resetView(false);
-        } else if (state.locked) {
-          const activeLoc = CampusRegistry.find(l => l.id === state.activeId);
-          if (activeLoc) zoomToLocation(activeLoc);
-          else applyTransform(true);
-        }
-      };
-      els.mapCore.addEventListener('transitionend', onEnd);
-    }
-
-    
-    
-    function showDetail(loc) { /* no-op */ }
-    function resetDetail() { /* no-op */ }
-
-    function setCategory(cat, btn) {
-      state.category = cat;
-      document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      filterLocations();
-    }
-
-    function filterLocations() {
-      state.query = els.search.value.trim().toLowerCase();
-      const filtered = CampusRegistry.filter(loc => {
-        const catMatch = state.category === 'All' || loc.category === state.category;
-        const q = state.query;
-        const qMatch = !q ||
-          loc.label.toLowerCase().includes(q) ||
-          loc.description.toLowerCase().includes(q) ||
-          loc.category.toLowerCase().includes(q) ||
-          (loc.aka && loc.aka.toLowerCase().includes(q)) ||
-          loc.offices.some(o => o.toLowerCase().includes(q)) ||
-          loc.services.some(s => s.toLowerCase().includes(q));
-        return catMatch && qMatch;
-      });
-      renderList(filtered);
-    }
-
-    function renderList(items) {
-      els.list.innerHTML = '';
-      if (!items.length) {
-        els.list.innerHTML = '<div class="empty-state">No locations match your search.</div>';
-        return;
-      }
-      /* Count label */
-      const countEl = document.createElement('div');
-      countEl.className = 'list-count';
-      countEl.textContent = `${items.length} location${items.length !== 1 ? 's' : ''}`;
-      els.list.appendChild(countEl);
-
-      items.forEach((loc, idx) => {
-        const div = document.createElement('div');
-        div.className = 'location-item';
-        div.dataset.locId = loc.id;
-        div.style.animationDelay = `${Math.min(idx * 45, 500)}ms`;
-        if (state.activeId === loc.id || state.hoveredId === loc.id) div.classList.add('active');
-
-        const iconClass = categoryIcon(loc.category);
-
-        div.innerHTML = `
+    div.innerHTML = `
       <div class="loc-icon"><i class="ph ${iconClass}"></i></div>
       <div class="loc-meta">
         <div class="loc-name">${loc.label}</div>
@@ -1394,164 +996,74 @@
       <i class="ph ph-caret-right loc-arrow"></i>
     `;
 
-        /* Debounced hover â€” 300ms delay prevents jittery rapid previews */
-        let hoverTimer = null;
-        div.addEventListener('mouseenter', () => {
-          if (state.locked) return;
-          hoverTimer = setTimeout(() => {
-            state.hoveredId = loc.id;
-            highlightLocation(loc, false);
-            showDetail(loc);
-            updateListActive();
-          }, 300);
-        });
-        div.addEventListener('mouseleave', () => {
-          clearTimeout(hoverTimer);
-          if (!state.locked && state.hoveredId === loc.id) {
-            state.hoveredId = null;
-            clearHighlight();
-            resetDetail();
-            updateListActive();
-          }
-        });
-        div.addEventListener('click', () => {
-          clearTimeout(hoverTimer);
-          selectLocation(loc);
-        });
-
-        els.list.appendChild(div);
-      });
-    }
-
-    function updateListActive() {
-      document.querySelectorAll('.location-item').forEach(el => {
-        const id = el.dataset.locId;
-        el.classList.toggle('active', id === state.activeId || id === state.hoveredId);
-      });
-    }
-
-    function categoryIcon(cat) {
-      switch (cat) {
-        case 'Academic': return 'ph-student';
-        case 'Administrative': return 'ph-buildings';
-        case 'Landmarks': return 'ph-flag-pennant';
-        case 'Sports & Recreation': return 'ph-basketball';
-        case 'Utility & Support': return 'ph-wrench';
-        default: return 'ph-map-pin';
-      }
-    }
-
-    
-    els.mapCore.addEventListener('mousedown', e => {
-      if (!isZoomed() && !state.locked) return;
-      if (e.target.tagName === 'AREA') return;
-      state.isDragging = true;
-      state.dragStartX = e.clientX;
-      state.dragStartY = e.clientY;
-      state.dragStartTx = state.tx;
-      state.dragStartTy = state.ty;
-      els.mapScaler.style.transition = 'none';
-      els.mapCore.style.cursor = 'grabbing';
+    div.addEventListener('mouseenter', () => {
+      if (!state.locked) { state.hoveredId = loc.id; highlightLocation(loc, false); showDetail(loc); updateListActive(); }
     });
-    window.addEventListener('mousemove', e => {
-      if (!state.isDragging) return;
-      const dx = e.clientX - state.dragStartX;
-      const dy = e.clientY - state.dragStartY;
-      state.tx = state.dragStartTx + dx;
-      state.ty = state.dragStartTy + dy;
-      applyTransform(false);
+    div.addEventListener('mouseleave', () => {
+      if (!state.locked) { state.hoveredId = null; clearHighlight(); resetDetail(); updateListActive(); }
     });
-    window.addEventListener('mouseup', () => {
-      if (state.isDragging) {
-        state.isDragging = false;
-        els.mapCore.style.cursor = 'crosshair';
-        els.mapScaler.style.transition = '';
-      }
-    });
+    div.addEventListener('click', () => selectLocation(loc));
 
-    
-    els.mapCore.addEventListener('wheel', e => {
-      e.preventDefault();
-      const rect = els.mapCore.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-      const minScale = state.baseScale || (getViewport().w / MAP_W);
-      const newScale = Math.min(Math.max(state.scale * zoomFactor, minScale), 6.0);
-      /* Zoom toward cursor so the point under it stays fixed */
-      state.tx = mx - (mx - state.tx) * (newScale / state.scale);
-      state.ty = my - (my - state.ty) * (newScale / state.scale);
-      state.scale = newScale;
-      applyTransform(false);
-      /* Show reset button if zoomed beyond default */
-      if (isZoomed()) els.resetBtn.classList.remove('hidden');
-      else els.resetBtn.classList.add('hidden');
-    }, { passive: false });
+    els.list.appendChild(div);
+  });
+}
 
-    
-    let touchState = { active: false, startDist: 0, startScale: 1, startTx: 0, startTy: 0 };
+function updateListActive() {
+  document.querySelectorAll('.location-item').forEach(el => {
+    const id = CampusRegistry.find(l => l.label === el.querySelector('.loc-name').textContent)?.id;
+    el.classList.toggle('active', id === state.activeId || id === state.hoveredId);
+  });
+}
 
-    function getTouchDist(t) {
-      return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-    }
-    function getTouchMid(t, rect) {
-      return { x: (t[0].clientX + t[1].clientX) / 2 - rect.left, y: (t[0].clientY + t[1].clientY) / 2 - rect.top };
-    }
+function categoryIcon(cat) {
+  switch(cat) {
+    case 'Academic': return 'ph-student';
+    case 'Administrative': return 'ph-buildings';
+    case 'Landmarks': return 'ph-monument';
+    case 'Sports & Recreation': return 'ph-basketball';
+    case 'Utility & Support': return 'ph-wrench';
+    default: return 'ph-map-pin';
+  }
+}
 
-    els.mapCore.addEventListener('touchstart', e => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        touchState.active = true;
-        touchState.startDist = getTouchDist(e.touches);
-        touchState.startScale = state.scale;
-        touchState.startTx = state.tx;
-        touchState.startTy = state.ty;
-        els.mapScaler.style.transition = 'none';
-      } else if (e.touches.length === 1 && (isZoomed() || state.locked)) {
-        state.isDragging = true;
-        state.dragStartX = e.touches[0].clientX;
-        state.dragStartY = e.touches[0].clientY;
-        state.dragStartTx = state.tx;
-        state.dragStartTy = state.ty;
-        els.mapScaler.style.transition = 'none';
-      }
-    }, { passive: false });
+/* ========================================================================
+   DRAG TO PAN (when zoomed in)
+   ======================================================================== */
+els.mapCore.addEventListener('mousedown', e => {
+  if (e.target.tagName === 'AREA') return;
+  state.isDragging = true;
+  state.dragStartX = e.clientX;
+  state.dragStartY = e.clientY;
+  state.dragStartTx = state.tx;
+  state.dragStartTy = state.ty;
+  els.mapStage.style.transition = 'none';
+  els.mapCore.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', e => {
+  if (!state.isDragging) return;
+  const dx = e.clientX - state.dragStartX;
+  const dy = e.clientY - state.dragStartY;
+  state.tx = state.dragStartTx + dx;
+  state.ty = state.dragStartTy + dy;
+  applyTransform(false);
+});
+window.addEventListener('mouseup', () => {
+  if (state.isDragging) {
+    state.isDragging = false;
+    els.mapCore.style.cursor = 'crosshair';
+    els.mapStage.style.transition = '';
+  }
+});
 
-    els.mapCore.addEventListener('touchmove', e => {
-      if (touchState.active && e.touches.length === 2) {
-        e.preventDefault();
-        const rect = els.mapCore.getBoundingClientRect();
-        const dist = getTouchDist(e.touches);
-        const mid = getTouchMid(e.touches, rect);
-        const minScale = state.baseScale || (getViewport().w / MAP_W);
-        const newScale = Math.min(Math.max(touchState.startScale * (dist / touchState.startDist), minScale), 6.0);
-        state.tx = mid.x - (mid.x - touchState.startTx) * (newScale / touchState.startScale);
-        state.ty = mid.y - (mid.y - touchState.startTy) * (newScale / touchState.startScale);
-        state.scale = newScale;
-        applyTransform(false);
-        if (isZoomed()) els.resetBtn.classList.remove('hidden');
-      } else if (state.isDragging && e.touches.length === 1) {
-        state.tx = state.dragStartTx + (e.touches[0].clientX - state.dragStartX);
-        state.ty = state.dragStartTy + (e.touches[0].clientY - state.dragStartY);
-        applyTransform(false);
-      }
-    }, { passive: false });
-
-    els.mapCore.addEventListener('touchend', () => {
-      touchState.active = false;
-      state.isDragging = false;
-      els.mapScaler.style.transition = '';
-    });
-
-    
-
-    function toggleHowTo() { els.howto.classList.toggle('show'); }
-    window.addEventListener('resize', () => {
-      fitMapToViewport();
-      if (!state.locked) resetView(true);
-      else applyTransform(true);
-    });
-  </script>
+/* ========================================================================
+   UTILITIES
+   ======================================================================== */
+function toggleAi() { els.aiStatement.classList.toggle('show'); }
+function toggleHowTo() { els.howto.classList.toggle('show'); }
+window.addEventListener('resize', () => {
+  if (!state.locked) resetView(true);
+  else applyTransform(true);
+});
+</script>
 </body>
-
 </html>
