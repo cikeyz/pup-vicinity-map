@@ -12,15 +12,7 @@
     rel="stylesheet">
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <style>
-    /* ========================================================================
-   PUP Campus Map - Centered Hero Map with Collapsible Directory
-   CMPE 364 Web & Mobile Systems | Activity 06
-   
-   The map is the primary hero element. The directory lives in a
-   collapsible slide-over panel on the right, giving the campus map the
-   full stage. PUP logo is displayed raw without enclosing shapes per brand
-   compliance. Light editorial minimalism with soft watercolor highlights.
-   ======================================================================== */
+    
 
     /* --- 1. VARIABLES & RESET --- */
     :root {
@@ -893,11 +885,7 @@
   </main>
 
   <script>
-    /* --- 1. CAMPUS REGISTRY DATA ---
-       Every building and landmark on the map lives here.
-       Each entry has a shape (poly/rect/circle), coordinate string,
-       category, description, and lists of offices and services.
-       The coordinates were traced manually from the PUP Stamesa map. */
+    
     const CampusRegistry = [
       { "id": "pylon", "label": "The Pylon", "shape": "poly", "coords": "1075,588,1111,578,1078,554,1041,564", "category": "Landmarks", "aka": "PUP Pylon / Main Gate Monument", "description": "The iconic three-pillar structure at the main entrance, symbolizing the university's three pillars: Instruction, Research, and Community Service.", "offices": [], "services": ["Visitor Inquiry", "Campus Entry Point"] },
       { "id": "mural", "label": "The Mural", "shape": "poly", "coords": "1033,606,1017,587,1012,590,1017,611", "category": "Landmarks", "aka": "PUP Mural Wall", "description": "A monumental bas-relief artwork depicting the history, struggles, and aspirations of the Filipino student movement and PUP academic community.", "offices": [], "services": [] },
@@ -939,10 +927,7 @@
       { "id": "antique", "label": "Antique House", "shape": "poly", "coords": "1128,78,1154,78,1153,65,1124,67", "category": "Landmarks", "aka": "PUP Heritage Center", "description": "A preserved historical house showcasing classic colonial Filipino residential architecture, serving as a living heritage museum on campus.", "offices": [], "services": ["Heritage Exhibits", "Architectural Studies"] }
     ];
 
-    /* --- 2. STATE & CONFIG ---
-       The global state object tracks what is selected, hovered, locked,
-       and the current zoom/pan transform. Keeping it all in one place
-       makes it easy to reason about what the map is doing at any moment. */
+    
     const MAP_W = 1488;
     const MAP_H = 811;
     const state = {
@@ -979,10 +964,7 @@
       howto: document.getElementById('howto-card')
     };
 
-    /* --- 3. INIT ---
-       On DOM ready, I build the <area> elements from the registry,
-       filter the directory list, fit the map to the viewport, and
-       set the initial zoom. */
+    
     document.addEventListener('DOMContentLoaded', () => {
       buildMapAreas();
       filterLocations();
@@ -1004,14 +986,10 @@
       });
     }
 
-    /* --- 4. VIEWPORT FIT ---
-       I compute the available space from the window dimensions and
-       adjust the map container to fill it while preserving the
-       original image aspect ratio. */
+    
     function fitMapToViewport() {
       const core = els.mapCore;
-      /* Compute available space from window dimensions directly to avoid
-         circular sizing with flex parents and CSS max constraints */
+      
       const panelW = state.panelOpen ? 360 + 16 : 0;
       const pw = window.innerWidth - 48 - 20 - panelW;  /* stage padding + hero padding */
 
@@ -1030,11 +1008,7 @@
       core.style.height = Math.max(0, h) + 'px';
     }
 
-    /* --- 5. ZOOM / PAN ENGINE ---
-       The map scales and translates via CSS transform on the scaler div.
-       resetView() returns to the default fit. selectLocation() zooms
-       into a chosen building and locks the view. zoomToLocation()
-       computes the tightest bounding box for the target coordinates. */
+    
     function getViewport() {
       const r = els.mapCore.getBoundingClientRect();
       return { w: r.width, h: r.height };
@@ -1119,14 +1093,7 @@
       }
     }
 
-    /* --- 6. CANVAS HIGHLIGHT ---
-       The overlay canvas draws soft, forgiving borders over the
-       selected or hovered building. I use quadratic bezier splines
-       through midpoints of the polygon vertices so the path flows
-       organically - this hides inaccurate coordinate plotting better
-       than sharp straight lines. A layered glow (outer gold halo,
-       inner maroon tint) makes the highlight legible against the
-       map image underneath. */
+    
     function clearHighlight() {
       els.ctx.clearRect(0, 0, MAP_W, MAP_H);
     }
@@ -1138,9 +1105,7 @@
 
       c.beginPath();
       if (loc.shape === 'poly') {
-        /* Draw smooth curves instead of sharp straight lines.
-           Uses quadratic bezier splines through midpoints so the path
-           flows organically â€” hides inaccurate coordinate plotting. */
+        
         const pts = [];
         for (let i = 0; i < coords.length; i += 2) pts.push({ x: coords[i], y: coords[i + 1] });
         if (pts.length > 2) {
@@ -1171,9 +1136,7 @@
         c.arc(coords[0], coords[1], coords[2], 0, Math.PI * 2);
       }
 
-      /* --- Bold PUP Gold highlight with soft, rounded edges ---
-         Highly visible but with forgiving borders (round joins, blurred glow)
-         to mask inaccurate coordinate plotting. */
+      
 
       const gold = [218, 165, 32];       // PUP Gold
       const maroon = [136, 0, 0];        // PUP Maroon
@@ -1220,13 +1183,10 @@
       c.stroke();
     }
 
-    /* --- 7. EVENT HANDLERS ---
-       Hover: highlight the building, show a tooltip (if not zoomed)
-       or the zoom-info card (if zoomed). Click: select/lock.
-       Mouse-out: clear highlights unless locked. */
+    
     function handleMapHover(loc) {
       if (state.locked) {
-        /* When locked and zoomed, show the info card for whatever we hover */
+        
         if (isZoomed()) showZoomInfoCard(loc);
         return;
       }
@@ -1288,9 +1248,7 @@
       tt.classList.remove('fixed');
     }
 
-    /* Builds the zoom-info card with location metadata, offices, and services.
-       This is the rich detail panel that appears anchored inside the map
-       viewport when a building is selected or hovered while zoomed in. */
+    
     function showZoomInfoCard(loc) {
       const card = document.getElementById('zoom-info-card');
 
@@ -1331,11 +1289,7 @@
       card.classList.remove('show');
     }
 
-    /* --- 8. PANEL ---
-       Toggles the collapsible directory panel on the right.
-       While the panel opens/closes, I continuously refit the map
-       using a rAF loop so it resizes smoothly during the CSS
-       transition. */
+    
     function togglePanel() {
       state.panelOpen = !state.panelOpen;
       els.panel.classList.toggle('open', state.panelOpen);
@@ -1381,15 +1335,8 @@
       els.mapCore.addEventListener('transitionend', onEnd);
     }
 
-    /* --- 9. SIDEBAR & DIRECTORY ---
-       setCategory() updates the active filter chip and re-renders.
-       filterLocations() matches both the category and search query
-       against every field in the location data (label, description,
-       offices, services, and alternate names).
-       renderList() builds location items with staggered animation
-       delays and a debounced hover preview. */
-    /* showDetail / resetDetail are no-ops now -- all detail lives inside the
-       zoom-info-card anchored in the map viewport rather than a separate panel. */
+    
+    
     function showDetail(loc) { /* no-op */ }
     function resetDetail() { /* no-op */ }
 
@@ -1494,10 +1441,7 @@
       }
     }
 
-    /* --- 10. DRAG TO PAN ---
-       When zoomed in beyond the default fit, the user can click
-       and drag the map. I disable the scaler transition during
-       the drag so it tracks the cursor without lag. */
+    
     els.mapCore.addEventListener('mousedown', e => {
       if (!isZoomed() && !state.locked) return;
       if (e.target.tagName === 'AREA') return;
@@ -1525,11 +1469,7 @@
       }
     });
 
-    /* --- 11. SCROLL TO ZOOM ---
-       I use the deltaY direction to determine zoom in/out.
-       The zoom is anchored to the cursor position so the point
-       under the mouse stays fixed while the rest of the map
-       scales around it. */
+    
     els.mapCore.addEventListener('wheel', e => {
       e.preventDefault();
       const rect = els.mapCore.getBoundingClientRect();
@@ -1548,10 +1488,7 @@
       else els.resetBtn.classList.add('hidden');
     }, { passive: false });
 
-    /* --- 12. TOUCH: PINCH TO ZOOM & DRAG ---
-       Same zoom/pan logic as mouse, but I track two touch points
-       for pinch gestures (distance between fingers = zoom level)
-       and one touch point for drag. */
+    
     let touchState = { active: false, startDist: 0, startScale: 1, startTx: 0, startTy: 0 };
 
     function getTouchDist(t) {
@@ -1606,10 +1543,7 @@
       els.mapScaler.style.transition = '';
     });
 
-    /* --- 13. UTILITIES ---
-       toggleHowTo shows/hides the usage instructions card.
-       The resize listener refits the map and resets the view
-       when the browser window changes size. */
+    
 
     function toggleHowTo() { els.howto.classList.toggle('show'); }
     window.addEventListener('resize', () => {
